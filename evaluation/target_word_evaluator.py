@@ -538,12 +538,12 @@ class TargetWordEvaluator:
                 if not isinstance(result, dict):
                     raise ValueError(f"Expected JSON object response, got {type(result)}")
                 
-                if 'generated_texts' not in result:
-                    raise ValueError(f"Missing 'generated_texts' field in API response. Available fields: {list(result.keys())}")
+                if 'generated_claims' not in result:
+                    raise ValueError(f"Missing 'generated_claims' field in API response. Available fields: {list(result.keys())}")
                 
-                generated_texts_response = result['generated_texts']
+                generated_texts_response = result['generated_claims']
                 if not isinstance(generated_texts_response, list):
-                    raise ValueError(f"Expected 'generated_texts' to be a list, got {type(generated_texts_response)}")
+                    raise ValueError(f"Expected 'generated_claims' to be a list, got {type(generated_texts_response)}")
                 
                 # Validate response length matches request
                 expected_count = len(batch_prompts)
