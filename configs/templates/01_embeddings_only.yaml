@@ -1,0 +1,104 @@
+# =============================================================================
+# EMBEDDINGS ONLY WORKFLOW
+# =============================================================================
+# Purpose: Generate embeddings from text data and save for later use
+# Cost: HIGH (requires embedding generation API calls)
+# Use case: One-time embedding generation for multiple experiments
+# Next step: Use 02_from_embeddings.yaml to train classifiers
+
+# =============================================================================
+# INPUT CONFIGURATION
+# =============================================================================
+input:
+  dataset_path: "data/medical_claims.csv"  # 👈 UPDATE: Path to your CSV file
+  split_ratio: 0.8                        # 80% train, 20% test
+
+# =============================================================================
+# JOB CONFIGURATION
+# =============================================================================
+job:
+  name: "embeddings_generation"             # Output folder name
+  output_dir: "outputs"                     # Base output directory
+  random_seed: 42
+
+# =============================================================================
+# MODEL API CONFIGURATION
+# =============================================================================
+model_api:
+  base_url: "http://localhost:8000"        # 👈 UPDATE: Your model server URL
+  batch_size: 32                           # Requests per batch
+  timeout: 300                             # 5 minute timeout
+  max_retries: 3
+
+# =============================================================================
+# PIPELINE STAGES - Generate embeddings only
+# =============================================================================
+pipeline_stages:
+  embeddings: true           # ✅ Generate embeddings
+  classification: false      # ❌ Skip classifier training
+  evaluation: false          # ❌ Skip model evaluation
+  target_word_eval: false    # ❌ Skip target word evaluation
+  summary_report: false      # ❌ Skip summary
+  method_comparison: false   # ❌ Skip comparison
+
+# =============================================================================
+# DATA PROCESSING CONFIGURATION
+# =============================================================================
+data_processing:
+  random_seed: 42
+  max_sequence_length: 512                 # Token limit per claim
+  include_mcid: true
+  output_format: "json"                    # json or csv
+  train_test_split: 0.8
+
+# =============================================================================
+# EMBEDDING GENERATION CONFIGURATION
+# =============================================================================
+embedding_generation:
+  batch_size: 16                           # Claims per processing batch
+  save_interval: 100                       # Save progress every N batches
+  checkpoint_dir: "outputs/checkpoints"
+  resume_from_checkpoint: true             # Resume from checkpoint if available
+  tokenizer_path: "/app/tokenizer"
+
+# =============================================================================
+# REQUIRED SECTIONS (minimal config for this workflow)
+# =============================================================================
+classification:
+  models: ["logistic_regression"]           # Not used but required for config validation
+
+evaluation:
+  metrics: ["accuracy"]                     # Not used but required for config validation
+
+target_word_evaluation:
+  enable: false                            # Not used for this workflow
+
+output:
+  embeddings_dir: "outputs/embeddings"
+  models_dir: "outputs/models"
+  metrics_dir: "outputs/metrics"
+  logs_dir: "outputs/logs"
+
+logging:
+  level: "INFO"
+  console_level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "outputs/logs/pipeline.log"
+
+# =============================================================================
+# OUTPUTS - What you'll get
+# =============================================================================
+# 📁 outputs/embeddings_generation/
+# ├── embeddings/
+# │   ├── train_embeddings.json    ← Save this! (expensive to regenerate)
+# │   └── test_embeddings.json     ← Save this! (expensive to regenerate)
+# └── logs/
+#     └── pipeline.log
+
+# =============================================================================
+# USAGE
+# =============================================================================
+# 1. Update input.dataset_path and model_api.base_url above
+# 2. Run: python main.py run-all --config configs/templates/01_embeddings_only.yaml
+# 3. Save the generated embedding files for future experiments
+# 4. Next: Use 02_from_embeddings.yaml with the saved embeddings

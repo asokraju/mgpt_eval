@@ -1,0 +1,151 @@
+# =============================================================================
+# CLASSIFICATION FROM EXISTING EMBEDDINGS WORKFLOW
+# =============================================================================
+# Purpose: Train classifiers using pre-computed embeddings
+# Cost: LOW (no API calls, only local computation)
+# Use case: Experiment with different classifiers after embeddings generated
+# Prerequisites: Run 01_embeddings_only.yaml first
+
+# =============================================================================
+# INPUT CONFIGURATION - Using pre-computed embeddings
+# =============================================================================
+input:
+  # 👈 UPDATE: Point to your saved embedding files
+  train_embeddings_path: "outputs/embeddings_generation/embeddings/train_embeddings.json"
+  test_embeddings_path: "outputs/embeddings_generation/embeddings/test_embeddings.json"
+
+# =============================================================================
+# JOB CONFIGURATION
+# =============================================================================
+job:
+  name: "classification_from_embeddings"
+  output_dir: "outputs"
+  random_seed: 42
+
+# =============================================================================
+# MODEL API CONFIGURATION (not used but required)
+# =============================================================================
+model_api:
+  base_url: "http://localhost:8000"
+  batch_size: 32
+  timeout: 300
+  max_retries: 3
+
+# =============================================================================
+# PIPELINE STAGES - Classification and evaluation only
+# =============================================================================
+pipeline_stages:
+  embeddings: false          # ❌ Skip (using pre-computed embeddings)
+  classification: true       # ✅ Train classifiers
+  evaluation: true           # ✅ Evaluate models
+  target_word_eval: false    # ❌ Skip target word evaluation
+  summary_report: true       # ✅ Create summary
+  method_comparison: false   # ❌ Skip (no target word method)
+
+# =============================================================================
+# DATA PROCESSING CONFIGURATION
+# =============================================================================
+data_processing:
+  random_seed: 42
+  max_sequence_length: 512
+  include_mcid: true
+  output_format: "json"
+  train_test_split: 0.8
+
+# =============================================================================
+# EMBEDDING GENERATION CONFIGURATION (not used but required)
+# =============================================================================
+embedding_generation:
+  batch_size: 16
+  save_interval: 100
+  checkpoint_dir: "outputs/checkpoints"
+  resume_from_checkpoint: true
+  tokenizer_path: "/app/tokenizer"
+
+# =============================================================================
+# CLASSIFICATION CONFIGURATION
+# =============================================================================
+classification:
+  models: ["logistic_regression", "svm", "random_forest"]  # Train all three
+  
+  cross_validation:
+    n_folds: 5
+    scoring: "roc_auc"
+    n_jobs: -1                          # Use all CPU cores
+  
+  hyperparameter_search:
+    logistic_regression:
+      C: [0.001, 0.01, 0.1, 1, 10, 100]
+      penalty: ["l1", "l2"]
+      solver: ["liblinear", "saga"]
+    
+    svm:
+      C: [0.1, 1, 10]
+      kernel: ["rbf", "linear"]
+      gamma: ["scale", "auto"]
+    
+    random_forest:
+      n_estimators: [100, 200, 300]
+      max_depth: [10, 20, 30, null]
+      min_samples_split: [2, 5, 10]
+
+# =============================================================================
+# EVALUATION CONFIGURATION
+# =============================================================================
+evaluation:
+  metrics: ["accuracy", "precision", "recall", "f1_score", "roc_auc", "confusion_matrix"]
+  
+  visualization:
+    generate_plots: true
+    plot_formats: ["png", "pdf"]
+    dpi: 300
+
+# =============================================================================
+# TARGET WORD EVALUATION CONFIGURATION (not used)
+# =============================================================================
+target_word_evaluation:
+  enable: false
+  target_codes: ["E119"]                  # Placeholder
+
+# =============================================================================
+# OUTPUT CONFIGURATION
+# =============================================================================
+output:
+  embeddings_dir: "outputs/embeddings"
+  models_dir: "outputs/models"
+  metrics_dir: "outputs/metrics"
+  logs_dir: "outputs/logs"
+  save_best_model_only: false
+  model_format: "pickle"
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+logging:
+  level: "INFO"
+  console_level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "outputs/logs/pipeline.log"
+
+# =============================================================================
+# OUTPUTS - What you'll get
+# =============================================================================
+# 📁 outputs/classification_from_embeddings/
+# ├── models/
+# │   ├── logistic_regression_model.pkl   ← Best LR model
+# │   ├── svm_model.pkl                   ← Best SVM model
+# │   └── random_forest_model.pkl         ← Best RF model
+# ├── metrics/
+# │   ├── logistic_regression/            ← LR evaluation results
+# │   ├── svm/                           ← SVM evaluation results
+# │   └── random_forest/                 ← RF evaluation results
+# └── summary/
+#     └── pipeline_summary.json          ← Overall results summary
+
+# =============================================================================
+# USAGE
+# =============================================================================
+# 1. First run 01_embeddings_only.yaml to generate embeddings
+# 2. Update the embedding paths above to match your generated files
+# 3. Run: python main.py run-all --config configs/templates/02_from_embeddings.yaml
+# 4. Compare model performance in the summary report

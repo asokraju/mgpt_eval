@@ -1,0 +1,139 @@
+# =============================================================================
+# TARGET WORD EVALUATION ONLY WORKFLOW
+# =============================================================================
+# Purpose: Evaluate model using target medical code presence in generated text
+# Cost: MEDIUM (requires text generation API calls)
+# Use case: Quick evaluation without training classifiers
+# Prerequisites: Target medical codes list
+
+# =============================================================================
+# INPUT CONFIGURATION
+# =============================================================================
+input:
+  dataset_path: "data/medical_claims.csv"  # 👈 UPDATE: Path to your CSV file
+  split_ratio: 0.8                        # Not used (full dataset for evaluation)
+
+# =============================================================================
+# JOB CONFIGURATION
+# =============================================================================
+job:
+  name: "target_word_evaluation"
+  output_dir: "outputs"
+  random_seed: 42
+
+# =============================================================================
+# MODEL API CONFIGURATION
+# =============================================================================
+model_api:
+  base_url: "http://localhost:8000"        # 👈 UPDATE: Your model server URL
+  batch_size: 16                           # Smaller batches for generation
+  timeout: 600                             # Longer timeout for generation
+  max_retries: 3
+
+# =============================================================================
+# PIPELINE STAGES - Target word evaluation only
+# =============================================================================
+pipeline_stages:
+  embeddings: false          # ❌ Skip embedding generation
+  classification: false      # ❌ Skip classifier training
+  evaluation: false          # ❌ Skip model evaluation
+  target_word_eval: true     # ✅ Run target word evaluation
+  summary_report: true       # ✅ Create summary
+  method_comparison: false   # ❌ Skip (no embedding method to compare)
+
+# =============================================================================
+# DATA PROCESSING CONFIGURATION
+# =============================================================================
+data_processing:
+  random_seed: 42
+  max_sequence_length: 512
+  include_mcid: true
+  output_format: "json"
+  train_test_split: 0.8
+
+# =============================================================================
+# EMBEDDING GENERATION CONFIGURATION (not used but required)
+# =============================================================================
+embedding_generation:
+  batch_size: 16
+  save_interval: 100
+  checkpoint_dir: "outputs/checkpoints"
+  resume_from_checkpoint: true
+  tokenizer_path: "/app/tokenizer"
+
+# =============================================================================
+# CLASSIFICATION CONFIGURATION (not used but required)
+# =============================================================================
+classification:
+  models: ["logistic_regression"]           # Placeholder
+
+# =============================================================================
+# EVALUATION CONFIGURATION (not used but required)
+# =============================================================================
+evaluation:
+  metrics: ["accuracy"]                     # Placeholder
+
+# =============================================================================
+# TARGET WORD EVALUATION CONFIGURATION
+# =============================================================================
+target_word_evaluation:
+  enable: true                             # ✅ Enable this evaluation method
+  
+  # 👈 UPDATE: Your target medical codes
+  target_codes: ["E119", "76642", "N6320", "K9289", "O0903", "Z91048", "M1710"]
+  # Alternative: Load codes from file
+  # target_codes_file: "configs/target_codes.txt"
+  
+  generations_per_prompt: 10               # Generate 10 times per input
+  max_new_tokens: 200                      # Generate up to 200 tokens
+  temperature: 0.8                         # Sampling temperature
+  top_k: 50                               # Top-k sampling
+  search_method: "exact"                   # Exact code matching
+
+# =============================================================================
+# OUTPUT CONFIGURATION
+# =============================================================================
+output:
+  embeddings_dir: "outputs/embeddings"
+  models_dir: "outputs/models"
+  metrics_dir: "outputs/metrics"
+  logs_dir: "outputs/logs"
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+logging:
+  level: "INFO"
+  console_level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "outputs/logs/pipeline.log"
+
+# =============================================================================
+# OUTPUTS - What you'll get
+# =============================================================================
+# 📁 outputs/target_word_evaluation/
+# ├── metrics/
+# │   └── target_word_evaluation/
+# │       ├── target_word_eval_summary.json      ← Overall accuracy, precision, recall
+# │       ├── target_word_eval_details.json      ← Per-sample results
+# │       └── target_word_predictions.csv        ← Detailed predictions
+# ├── summary/
+# │   └── pipeline_summary.json                  ← Summary report
+# └── logs/
+#     └── pipeline.log
+
+# =============================================================================
+# USAGE
+# =============================================================================
+# 1. Update input.dataset_path with your CSV file
+# 2. Update model_api.base_url with your model server URL  
+# 3. Update target_word_evaluation.target_codes with your medical codes
+# 4. Run: python main.py run-all --config configs/templates/03_target_words_only.yaml
+# 5. Check the summary for overall accuracy metrics
+#
+# EVALUATION METHOD:
+# - For each medical claim, generates text N times
+# - Searches generated text for target medical codes
+# - If any target code found → Prediction = 1 (positive)
+# - If no target codes found → Prediction = 0 (negative)
+# - Compares predictions against true labels to calculate metrics

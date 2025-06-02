@@ -1,0 +1,50 @@
+[
+  {
+    "mcid": "MC001",
+    "prompt": "Patient shows excellent improvement",
+    "prompt_truncated": false,
+    "original_prompt_length": 35,
+    "truncated_prompt_length": null,
+    "original_prompt_tokens": null,
+    "truncated_prompt_tokens": null,
+    "true_label": 1,
+    "predicted_label": 0,
+    "word_found_count": 0,
+    "word_found_ratio": 0.0,
+    "samples": [
+      {
+        "sample_idx": 0,
+        "generated_text": "positive great good review",
+        "any_word_found": false,
+        "word_matches": {
+          "approved": false,
+          "excellent": false
+        }
+      }
+    ]
+  },
+  {
+    "mcid": "MC002",
+    "prompt": "Treatment was denied by insurance",
+    "prompt_truncated": false,
+    "original_prompt_length": 33,
+    "truncated_prompt_length": null,
+    "original_prompt_tokens": null,
+    "truncated_prompt_tokens": null,
+    "true_label": 0,
+    "predicted_label": 0,
+    "word_found_count": 0,
+    "word_found_ratio": 0.0,
+    "samples": [
+      {
+        "sample_idx": 0,
+        "generated_text": "good accepted treatment should",
+        "any_word_found": false,
+        "word_matches": {
+          "approved": false,
+          "excellent": false
+        }
+      }
+    ]
+  }
+]
