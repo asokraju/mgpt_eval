@@ -4,6 +4,32 @@
 - [x] Analyze all occurrences of '_texts' in the codebase
 - [x] Identify where '_texts' should be replaced with '_claims'
 - [x] Create fix plan for API response handling
+- [x] Create branch for MCID uniqueness validation (fix/mcid-uniqueness-validation)
+- [x] Add MCID uniqueness validation to all data loading methods
+- [x] Test validation logic with various scenarios
+
+## MCID Uniqueness Validation
+
+### Implementation
+Added validation to ensure MCID values are unique when loading datasets. The validation was added to:
+
+1. **models/data_models.py** - `Dataset.from_file()` method
+2. **pipelines/embedding_pipeline.py** - `_load_dataset()` method
+3. **evaluation/target_word_evaluator.py** - `_load_dataset()` method
+
+### Validation Logic
+- Checks for duplicate MCID values after loading the dataset
+- If duplicates are found, raises a ValueError with:
+  - Total count of rows with duplicate MCIDs
+  - Sample of up to 5 duplicate MCID values
+  - Indication if there are more duplicates beyond the sample
+
+### Error Message Format
+```
+Found {duplicate_count} rows with duplicate MCID values. 
+MCIDs must be unique. Duplicate MCIDs include: ['MC001', 'MC002', ...]
+(and X more)
+```
 
 ## Bug Fix: API Response Field Name
 

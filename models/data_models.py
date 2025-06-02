@@ -72,6 +72,21 @@ class Dataset(BaseModel):
         if missing_cols:
             raise ValueError(f"Missing required columns: {missing_cols}")
         
+        # Validate MCID uniqueness
+        if 'mcid' in df.columns:
+            duplicate_mcids = df[df.duplicated(subset=['mcid'], keep=False)]
+            if not duplicate_mcids.empty:
+                duplicate_count = len(duplicate_mcids)
+                unique_duplicates = df[df.duplicated(subset=['mcid'])]['mcid'].unique()
+                sample_duplicates = list(unique_duplicates[:5])
+                error_msg = (
+                    f"Found {duplicate_count} rows with duplicate MCID values. "
+                    f"MCIDs must be unique. Duplicate MCIDs include: {sample_duplicates}"
+                )
+                if len(unique_duplicates) > 5:
+                    error_msg += f" (and {len(unique_duplicates) - 5} more)"
+                raise ValueError(error_msg)
+        
         # Ensure we're using 'claims' as the primary column name
         
         return cls.from_dataframe(df)

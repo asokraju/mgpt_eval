@@ -139,6 +139,21 @@ class TargetWordEvaluator:
         if missing_cols:
             raise ValueError(f"Missing required columns: {missing_cols}")
         
+        # Validate MCID uniqueness
+        duplicate_mcids = data[data.duplicated(subset=['mcid'], keep=False)]
+        if not duplicate_mcids.empty:
+            duplicate_count = len(duplicate_mcids)
+            unique_duplicates = data[data.duplicated(subset=['mcid'])]['mcid'].unique()
+            sample_duplicates = list(unique_duplicates[:5])
+            error_msg = (
+                f"Found {duplicate_count} rows with duplicate MCID values. "
+                f"MCIDs must be unique. Duplicate MCIDs include: {sample_duplicates}"
+            )
+            if len(unique_duplicates) > 5:
+                error_msg += f" (and {len(unique_duplicates) - 5} more)"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        
         return data
     
     def _generate_predictions(self, data: pd.DataFrame, target_words: List[str],
