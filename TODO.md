@@ -69,3 +69,44 @@ After implementing the fix:
 ### Notes
 - Internal variable names (`generated_texts_response`, `generated_texts`) don't need to change
 - The fix is backward-compatible if we need to support both field names
+
+## Token Decoding Fix
+
+### Issue
+The API returns token IDs that need to be decoded before searching for target codes.
+
+### Implementation
+Added token decoding functionality to `evaluation/target_word_evaluator.py`:
+
+1. **Added tokenizer initialization** in `__init__` method
+   - Imports `AutoTokenizer` from transformers
+   - Calls `_initialize_tokenizer()` during initialization
+   - Throws error if tokenizer path is not specified or loading fails
+
+2. **Added `_initialize_tokenizer()` method**
+   - Loads tokenizer from path specified in config
+   - Raises `ValueError` if tokenizer path is missing or invalid
+   - No fallback - tokenizer is required
+
+3. **Updated `_generate_cross_mcid_batch()` method**
+   - Handles both token IDs (list) and text (string) from API
+   - Decodes token IDs using tokenizer before processing
+   - Raises `RuntimeError` if API returns tokens but tokenizer unavailable
+   
+4. **Also fixed API response field**
+   - Changed from `generated_texts` to `generated_claims`
+
+### Configuration Required
+The tokenizer path can be specified in either location:
+
+```yaml
+# Option 1: In target_word_evaluation section (takes precedence)
+target_word_evaluation:
+  tokenizer_path: "/path/to/tokenizer"
+
+# Option 2: In embedding_generation section (shared)
+embedding_generation:
+  tokenizer_path: "/path/to/tokenizer"
+```
+
+The implementation checks `target_word_evaluation.tokenizer_path` first, then falls back to `embedding_generation.tokenizer_path`. This avoids duplication while allowing module-specific overrides if needed.

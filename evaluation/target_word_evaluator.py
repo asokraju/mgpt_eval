@@ -18,6 +18,7 @@ from sklearn.metrics import (
     f1_score, confusion_matrix
 )
 import re
+from transformers import AutoTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +43,36 @@ class TargetWordEvaluator:
         self.target_config = self.config['target_word_evaluation']
         self.output_config = self.config.get('output', {})
         
-        # No tokenizer needed - generate API handles context windows automatically
-        logger.info("Target word evaluator initialized without tokenizer (API handles context windows)")
+        # Initialize tokenizer for decoding API responses
+        self._initialize_tokenizer()
+    
+    def _initialize_tokenizer(self):
+        """Initialize the tokenizer for decoding token IDs from API responses."""
+        # First check target_word_evaluation config, then fall back to embedding_generation
+        tokenizer_path = self.target_config.get('tokenizer_path', None)
+        
+        if not tokenizer_path:
+            # Try to get from embedding_generation section as fallback
+            embedding_config = self.config.get('embedding_generation', {})
+            tokenizer_path = embedding_config.get('tokenizer_path', None)
+        
+        if not tokenizer_path:
+            raise ValueError(
+                "No tokenizer path found in config. "
+                "Tokenizer is required for decoding API responses. "
+                "Please set 'tokenizer_path' in either:\n"
+                "1. 'target_word_evaluation' section (preferred for this module), or\n"
+                "2. 'embedding_generation' section (shared across modules)"
+            )
+            
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+            logger.info(f"Loaded tokenizer from {tokenizer_path}")
+        except Exception as e:
+            raise ValueError(
+                f"Failed to load tokenizer from {tokenizer_path}: {e}. "
+                "Please ensure the tokenizer path is correct and accessible."
+            )
     
     def evaluate(self, dataset_path: str, target_words: List[str],
                 n_samples: int, max_tokens: int,
@@ -553,13 +582,28 @@ class TargetWordEvaluator:
                 
                 # Extract and validate generated texts
                 generated_texts = []
-                for i, generated_text in enumerate(generated_texts_response):
-                    if generated_text is None:
+                for i, generated_output in enumerate(generated_texts_response):
+                    if generated_output is None:
                         logger.warning(f"API returned None for prompt {i}, using empty string")
                         generated_text = ""
-                    elif not isinstance(generated_text, str):
-                        logger.warning(f"API returned non-string type {type(generated_text)} for prompt {i}, converting to string")
-                        generated_text = str(generated_text)
+                    elif isinstance(generated_output, list):
+                        # API returned token IDs - decode them
+                        if not self.tokenizer:
+                            raise RuntimeError(
+                                "API returned token IDs but tokenizer is not initialized. "
+                                "This should not happen - tokenizer initialization is required."
+                            )
+                        try:
+                            generated_text = self.tokenizer.decode(generated_output, skip_special_tokens=True)
+                            logger.debug(f"Decoded {len(generated_output)} tokens to text for prompt {i}")
+                        except Exception as e:
+                            raise RuntimeError(f"Failed to decode tokens for prompt {i}: {e}")
+                    elif isinstance(generated_output, str):
+                        # API returned text directly
+                        generated_text = generated_output
+                    else:
+                        logger.warning(f"API returned unexpected type {type(generated_output)} for prompt {i}, converting to string")
+                        generated_text = str(generated_output)
                     
                     prompt = batch_prompts[i]
                     # Extract only the generated part (excluding the prompt)
