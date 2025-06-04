@@ -5,8 +5,14 @@
 ### Critical - Memory Issues
 - [x] Investigate JavaScript heap out of memory error 
 - [x] Identify Node.js default heap limit (4GB on 64-bit systems)
-- [ ] Configure increased memory limit for Claude Code CLI
+- [x] Configure increased memory limit for Claude Code CLI (NODE_OPTIONS set to 8GB)
 - [ ] Add memory optimization guidelines to CLAUDE.md
+
+### Gradient Boosting Models
+- [x] Create XGBoost classification notebook using embeddings
+- [x] Create LightGBM classification notebook using embeddings
+- [ ] Run performance comparison between XGBoost and LightGBM
+- [ ] Document best practices for gradient boosting with embeddings
 
 ### High Priority
 - [x] Review existing VAE notebook and Pythae integration
