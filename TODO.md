@@ -1,19 +1,49 @@
 # TODO
 
-## Current Tasks
-- [x] Fix file path issue in embedding pipeline logging configuration
-- [x] Fix import errors in all example notebooks
-- [x] Update notebooks to use correct class names (PipelineConfig, get_logger)
-- [x] Test notebook functionality with mgpt-eval conda environment
-- [x] Fix ClassificationPipeline to accept PipelineConfig objects instead of only dictionaries
-- [x] Fix EndToEndPipeline notebook to properly create PipelineJob configuration
-- [x] Fix ClassificationPipeline.run() method call in notebook (requires explicit parameters)
-- [x] Fix relative path issues in classification config (use absolute paths)
-- [x] Update notebook to handle correct model output file structure
-- [x] Fix EndToEndPipeline configuration file paths (use absolute paths)
-- [x] Update EndToEndPipeline notebook to handle job-specific output directory structure
-- [x] Fix deprecated Pydantic .dict() method calls (use .model_dump() instead)
-- [x] Validate EndToEndPipeline initialization and configuration
+## Current Tasks - Population Health Analytics with VAE (June 4, 2025)
+
+### Critical - Memory Issues
+- [x] Investigate JavaScript heap out of memory error 
+- [x] Identify Node.js default heap limit (4GB on 64-bit systems)
+- [ ] Configure increased memory limit for Claude Code CLI
+- [ ] Add memory optimization guidelines to CLAUDE.md
+
+### High Priority
+- [x] Review existing VAE notebook and Pythae integration
+- [x] Define population health analytics requirements and metrics  
+- [x] Design member embedding analysis framework
+- [x] Create new notebook for population health analytics with Pythae VAE
+- [ ] Implement Pythae-based VAE architectures (β-VAE, conditional VAE, hierarchical VAE)
+
+### Medium Priority  
+- [ ] Implement VAE-based population health insights
+  - [ ] Member risk stratification using latent space positioning
+  - [ ] Health phenotype identification through latent clustering
+  - [ ] Care pathway analysis via latent interpolation
+- [ ] Add member clustering and cohort analysis
+  - [ ] Dynamic cohort segmentation based on embedding evolution
+  - [ ] Chronic condition group identification
+  - [ ] Utilization pattern clustering
+- [ ] Implement risk stratification using embeddings
+  - [ ] Reconstruction error-based outlier detection for high-risk members
+  - [ ] Risk scoring from latent representations
+  - [ ] Early warning systems using latent trajectories
+- [ ] Build outcome prediction models from member embeddings
+  - [ ] Healthcare utilization forecasting
+  - [ ] Cost prediction models
+  - [ ] Health deterioration prediction
+
+### Low Priority
+- [ ] Create interactive visualizations for population insights
+  - [ ] Real-time population health monitoring dashboard
+  - [ ] Member journey visualization in latent space
+  - [ ] Risk stratification dashboards
+- [ ] Update documentation with population health analytics
+  - [ ] Population health methodology documentation
+  - [ ] Clinical interpretation guidelines
+  - [ ] Model validation and performance metrics
+
+## Previous Tasks (Completed)
 
 ## Completed Tasks
 - [x] Analyze all occurrences of '_texts' in the codebase
