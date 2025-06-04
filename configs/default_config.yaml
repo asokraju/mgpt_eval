@@ -77,7 +77,7 @@ embedding_generation:
   save_interval: 100
   checkpoint_dir: "outputs/checkpoints"
   resume_from_checkpoint: true
-  tokenizer_path: "/app/tokenizer"
+  tokenizer_path: "/home/kosaraju/mgpt-serve/tokenizer"
 
 # =============================================================================
 # CLASSIFICATION CONFIGURATION

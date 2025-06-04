@@ -1,0 +1,93 @@
+# Edge Case Testing Configuration
+# Used for testing error handling and edge cases
+
+input:
+  dataset_path: "data/edge_case_test.csv"
+  split_ratio: 0.8
+
+job:
+  name: "edge_case_test"
+  output_dir: "outputs"
+  random_seed: 42
+
+model_api:
+  base_url: "http://localhost:8000"
+  timeout: 30  # Minimum required timeout
+  max_retries: 1  # Fewer retries for faster failure detection
+  batch_size: 32
+  
+  endpoints:
+    embeddings: "/embeddings"
+    embeddings_batch: "/embeddings_batch"
+    generate: "/generate"
+    generate_batch: "/generate_batch"
+
+pipeline_stages:
+  embeddings: true
+  classification: false
+  evaluation: false
+  target_word_eval: false
+  summary_report: false
+  method_comparison: false
+
+data_processing:
+  random_seed: 42
+  max_sequence_length: 512
+  include_mcid: true
+  output_format: "json"
+  train_test_split: 0.8
+
+embedding_generation:
+  batch_size: 2
+  save_interval: 100
+  checkpoint_dir: "outputs/checkpoints"
+  resume_from_checkpoint: false
+  tokenizer_path: "/home/kosaraju/mgpt-serve/tokenizer"
+
+classification:
+  models: ["logistic_regression"]
+  
+  cross_validation:
+    n_folds: 5
+    scoring: "roc_auc"
+    n_jobs: -1
+  
+  hyperparameter_search:
+    logistic_regression:
+      C: [0.1, 1, 10]
+      penalty: ["l1", "l2"]
+      solver: ["liblinear", "saga"]
+
+evaluation:
+  metrics: ["accuracy", "precision", "recall", "f1_score", "roc_auc"]
+  
+  visualization:
+    generate_plots: false
+    plot_formats: ["png"]
+    dpi: 300
+
+target_word_evaluation:
+  enable: false
+  target_codes: ["E119"]
+  
+  generations_per_prompt: 10
+  max_new_tokens: 200
+  temperature: 0.8
+  top_k: 50
+  search_method: "exact"
+
+output:
+  embeddings_dir: "outputs/embeddings"
+  models_dir: "outputs/models"
+  metrics_dir: "outputs/metrics"
+  logs_dir: "outputs/logs"
+  save_best_model_only: false
+  model_format: "pickle"
+
+logging:
+  level: "DEBUG"  # More verbose logging for edge case debugging
+  console_level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "outputs/logs/edge_case_test.log"
+  max_file_size: "10MB"
+  backup_count: 5

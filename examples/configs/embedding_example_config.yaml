@@ -1,0 +1,98 @@
+# =============================================================================
+# EMBEDDING PIPELINE EXAMPLE CONFIGURATION
+# =============================================================================
+# This configuration demonstrates how to generate embeddings from medical claims
+# using the MediClaimGPT model API.
+
+# =============================================================================
+# INPUT CONFIGURATION
+# =============================================================================
+input:
+  dataset_path: "data/medical_claims_sample.csv"
+  split_ratio: 0.8
+
+# =============================================================================
+# JOB CONFIGURATION
+# =============================================================================
+job:
+  name: "embedding_generation_example"
+  output_dir: "examples/outputs"
+  random_seed: 42
+
+# =============================================================================
+# MODEL API CONFIGURATION
+# =============================================================================
+model_api:
+  base_url: "http://localhost:8000"
+  timeout: 300
+  max_retries: 3
+  batch_size: 32
+  
+  endpoints:
+    embeddings: "/embeddings"
+    embeddings_batch: "/embeddings_batch"
+    generate: "/generate"
+    generate_batch: "/generate_batch"
+
+# =============================================================================
+# PIPELINE STAGES - Only embedding generation enabled
+# =============================================================================
+pipeline_stages:
+  embeddings: true           # Generate embeddings from claims
+  classification: false      # Skip classification for this example
+  evaluation: false          # Skip evaluation for this example
+  target_word_eval: false    # Skip target word evaluation
+  summary_report: false      # Skip summary report
+  method_comparison: false   # Skip method comparison
+
+# =============================================================================
+# DATA PROCESSING CONFIGURATION
+# =============================================================================
+data_processing:
+  random_seed: 42
+  max_sequence_length: 512   # Maximum tokens per claim
+  include_mcid: true         # Include medical claim IDs
+  output_format: "json"      # JSON format for embeddings
+  train_test_split: 0.8      # 80% train, 20% test
+
+# =============================================================================
+# EMBEDDING GENERATION CONFIGURATION
+# =============================================================================
+embedding_generation:
+  batch_size: 8              # Process 8 claims at a time
+  save_interval: 100         # Save progress every 100 samples
+  checkpoint_dir: "examples/outputs/checkpoints"
+  resume_from_checkpoint: false
+  tokenizer_path: "/home/kosaraju/mgpt-serve/tokenizer"  # Path to model tokenizer
+
+# =============================================================================
+# OUTPUT CONFIGURATION
+# =============================================================================
+output:
+  embeddings_dir: "examples/outputs/embeddings"
+  models_dir: "examples/outputs/models"
+  metrics_dir: "examples/outputs/metrics"
+  logs_dir: "examples/outputs/logs"
+  save_best_model_only: false
+  model_format: "pickle"
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+logging:
+  level: "INFO"
+  console_level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "/home/kosaraju/mgpt_eval/examples/outputs/logs/embedding_pipeline.log"
+  max_file_size: "10MB"
+  backup_count: 5
+
+# =============================================================================
+# EXAMPLE USAGE NOTES
+# =============================================================================
+# This configuration file demonstrates:
+# 1. How to set up embedding generation from medical claims
+# 2. API connection settings for MediClaimGPT model
+# 3. Batch processing configuration for optimal performance
+# 4. Output directory structure for organized results
+# 5. Logging configuration for debugging and monitoring

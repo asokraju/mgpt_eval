@@ -1,0 +1,19 @@
+# Test outputs
+outputs/
+*.log
+
+# Test data (auto-generated)
+data/*.csv
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

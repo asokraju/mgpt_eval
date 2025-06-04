@@ -1,0 +1,170 @@
+# =============================================================================
+# END-TO-END PIPELINE EXAMPLE CONFIGURATION
+# =============================================================================
+# This configuration demonstrates the complete MGPT-Eval pipeline:
+# Data → Embeddings → Classification → Evaluation
+
+# =============================================================================
+# INPUT CONFIGURATION
+# =============================================================================
+input:
+  dataset_path: "/home/kosaraju/mgpt_eval/examples/data/medical_claims_complete.csv"
+  split_ratio: 0.8
+
+# =============================================================================
+# JOB CONFIGURATION
+# =============================================================================
+job:
+  name: "end_to_end_pipeline_example"
+  output_dir: "/home/kosaraju/mgpt_eval/examples/outputs"
+  random_seed: 42
+
+# =============================================================================
+# MODEL API CONFIGURATION
+# =============================================================================
+model_api:
+  base_url: "http://localhost:8000"
+  timeout: 300
+  max_retries: 3
+  batch_size: 32
+  
+  endpoints:
+    embeddings: "/embeddings"
+    embeddings_batch: "/embeddings_batch"
+    generate: "/generate"
+    generate_batch: "/generate_batch"
+
+# =============================================================================
+# PIPELINE STAGES - Complete workflow enabled
+# =============================================================================
+pipeline_stages:
+  embeddings: true           # Step 1: Generate embeddings
+  classification: true       # Step 2: Train classifiers
+  evaluation: true           # Step 3: Evaluate models
+  target_word_eval: false    # Optional: Target word evaluation
+  summary_report: true       # Step 4: Generate summary report
+  method_comparison: true    # Step 5: Compare different methods
+
+# =============================================================================
+# DATA PROCESSING CONFIGURATION
+# =============================================================================
+data_processing:
+  random_seed: 42
+  max_sequence_length: 512
+  include_mcid: true
+  output_format: "json"
+  train_test_split: 0.8
+
+# =============================================================================
+# EMBEDDING GENERATION CONFIGURATION
+# =============================================================================
+embedding_generation:
+  batch_size: 16             # Larger batches for efficiency
+  save_interval: 100
+  checkpoint_dir: "/home/kosaraju/mgpt_eval/examples/outputs/checkpoints"
+  resume_from_checkpoint: true   # Allow resuming from checkpoints
+  tokenizer_path: "/home/kosaraju/mgpt-serve/tokenizer"
+
+# =============================================================================
+# CLASSIFICATION CONFIGURATION
+# =============================================================================
+classification:
+  # Train multiple classifiers for comparison
+  models: ["logistic_regression", "svm", "random_forest"]
+  
+  cross_validation:
+    n_folds: 5
+    scoring: "roc_auc"
+    n_jobs: -1
+  
+  # Optimized hyperparameter grids for production use
+  hyperparameter_search:
+    logistic_regression:
+      C: [0.01, 0.1, 1, 10, 100]
+      penalty: ["l1", "l2"]
+      solver: ["liblinear", "saga"]
+    
+    svm:
+      C: [0.1, 1, 10]
+      kernel: ["rbf", "linear"]
+      gamma: ["scale", "auto"]
+    
+    random_forest:
+      n_estimators: [100, 200, 300]
+      max_depth: [10, 20, 30, None]
+      min_samples_split: [2, 5, 10]
+
+# =============================================================================
+# EVALUATION CONFIGURATION
+# =============================================================================
+evaluation:
+  metrics: ["accuracy", "precision", "recall", "f1_score", "roc_auc", "confusion_matrix"]
+  
+  visualization:
+    generate_plots: true
+    plot_formats: ["png", "pdf"]
+    dpi: 300
+
+# =============================================================================
+# TARGET WORD EVALUATION (Optional)
+# =============================================================================
+target_word_evaluation:
+  enable: false
+  target_codes: ["E119", "76642", "N6320", "K9289"]
+  generations_per_prompt: 10
+  max_new_tokens: 200
+  temperature: 0.8
+  top_k: 50
+  search_method: "exact"
+
+# =============================================================================
+# OUTPUT CONFIGURATION
+# =============================================================================
+output:
+  embeddings_dir: "/home/kosaraju/mgpt_eval/examples/outputs/embeddings"
+  models_dir: "/home/kosaraju/mgpt_eval/examples/outputs/models"
+  metrics_dir: "/home/kosaraju/mgpt_eval/examples/outputs/metrics"
+  logs_dir: "/home/kosaraju/mgpt_eval/examples/outputs/logs"
+  save_best_model_only: false
+  model_format: "pickle"
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+logging:
+  level: "INFO"
+  console_level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "/home/kosaraju/mgpt_eval/examples/outputs/logs/end_to_end_pipeline.log"
+  max_file_size: "10MB"
+  backup_count: 5
+
+# =============================================================================
+# COMPLETE WORKFLOW DESCRIPTION
+# =============================================================================
+# This configuration executes the complete MGPT-Eval pipeline:
+#
+# Phase 1: Data Processing
+# - Load medical claims from CSV
+# - Validate data format and integrity
+# - Create train/test splits
+#
+# Phase 2: Embedding Generation
+# - Connect to MediClaimGPT API
+# - Generate embeddings for all claims
+# - Save embeddings with metadata
+#
+# Phase 3: Classification Training
+# - Train multiple classifier types
+# - Perform hyperparameter optimization
+# - Cross-validate model performance
+#
+# Phase 4: Model Evaluation
+# - Evaluate on test set
+# - Generate performance metrics
+# - Create visualization plots
+#
+# Phase 5: Reporting
+# - Generate summary report
+# - Compare different methods
+# - Save all results and models

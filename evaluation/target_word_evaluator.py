@@ -6,6 +6,8 @@ import json
 import logging
 import yaml
 import requests
+import time
+import hashlib
 from pathlib import Path
 from typing import Dict, List, Any, Tuple, Optional
 import pandas as pd
@@ -38,9 +40,21 @@ class TargetWordEvaluator:
             # Already a dictionary
             self.config = config
         
+        # Validate required config sections
+        if 'model_api' not in self.config:
+            raise ValueError("Missing required 'model_api' configuration section")
+        if 'target_word_evaluation' not in self.config:
+            raise ValueError("Missing required 'target_word_evaluation' configuration section")
+        
         self.model_config = self.config['model_api']
         self.target_config = self.config['target_word_evaluation']
         self.output_config = self.config.get('output', {})
+        
+        # Validate critical config values
+        if not self.model_config.get('base_url'):
+            raise ValueError("Missing required 'base_url' in model_api configuration")
+        if not self.model_config.get('endpoints', {}).get('generate_batch'):
+            logger.warning("Missing 'generate_batch' endpoint in config, will use default")
         
         # No tokenizer needed - generate API handles context windows automatically
         logger.info("Target word evaluator initialized without tokenizer (API handles context windows)")
@@ -87,6 +101,16 @@ class TargetWordEvaluator:
         
         logger.info(f"Starting target word evaluation for words: {clean_target_words}")
         target_words = clean_target_words  # Use cleaned words
+        
+        # FIXED: Add validation for numeric parameters
+        if not isinstance(n_samples, int) or n_samples <= 0:
+            raise ValueError(f"n_samples must be a positive integer, got: {n_samples}")
+        if not isinstance(max_tokens, int) or max_tokens <= 0:
+            raise ValueError(f"max_tokens must be a positive integer, got: {max_tokens}")
+        if n_samples > 1000:
+            logger.warning(f"Large n_samples ({n_samples}) may cause performance issues")
+        if max_tokens > 4096:
+            logger.warning(f"Large max_tokens ({max_tokens}) may cause API issues")
         
         # Load dataset
         data = self._load_dataset(dataset_path)
@@ -158,7 +182,7 @@ class TargetWordEvaluator:
     
     def _generate_predictions(self, data: pd.DataFrame, target_words: List[str],
                             n_samples: int, max_tokens: int,
-                            model_endpoint: str, dataset_path: str) -> Tuple[np.ndarray, List[Dict]]:
+                            model_endpoint: str, dataset_path: str) -> Tuple[np.ndarray, Dict[str, Dict]]:
         """
         Generate predictions using dictionary-based MCID tracking for optimal efficiency.
         
@@ -185,7 +209,9 @@ class TargetWordEvaluator:
         elif model_endpoint.endswith('/generate'):
             endpoint = model_endpoint.replace('/generate', '/generate_batch')
         else:
-            endpoint = f"{model_endpoint.rstrip('/')}{self.model_config['endpoints']['generate_batch']}"
+            # FIXED: Use safe get with default for endpoints
+            batch_endpoint = self.model_config.get('endpoints', {}).get('generate_batch', '/generate_batch')
+            endpoint = f"{model_endpoint.rstrip('/')}{batch_endpoint}"
         
         # STEP 1: INITIALIZE TRACKING STRUCTURES WITH CHECKPOINT SUPPORT
         # ==============================================================
@@ -195,13 +221,12 @@ class TargetWordEvaluator:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         
         # Generate unique checkpoint filename based on dataset and target words
-        import hashlib
         checkpoint_key = hashlib.md5(f"{dataset_path}_{target_words}_{n_samples}_{max_tokens}".encode()).hexdigest()[:8]
         checkpoint_file = checkpoint_dir / f"target_eval_checkpoint_{checkpoint_key}.json"
         
         # Try to resume from checkpoint
         pending_mcids, predictions, generation_details, batch_count = self._load_checkpoint(
-            checkpoint_file, data, target_words, n_samples
+            checkpoint_file, data, target_words, n_samples, max_tokens
         )
         
         # Fast lookup for remaining operations
@@ -209,6 +234,9 @@ class TargetWordEvaluator:
         
         # Get batch size from config (defaults to 32 if not specified)
         batch_size = self.model_config.get('batch_size', 32)
+        
+        # Initialize start_time BEFORE logging (fixes critical bug)
+        start_time = time.time()
         
         if batch_count == 0:
             logger.info(f"Starting NEW dictionary-based processing: {len(pending_mcids)} MCIDs, "
@@ -222,7 +250,10 @@ class TargetWordEvaluator:
         
         # Initialize batch failure tracking with bounded cache to prevent memory leaks
         self._batch_failures = OrderedDict()
-        max_failure_tracking = 100  # Limit failure tracking to last 100 batches
+        max_failure_tracking = 50  # FIXED: Reduced limit to prevent memory leaks
+        
+        # Initialize _last_batch_key to fix attribute error
+        self._last_batch_key = None
         
         # STEP 2: MAIN PROCESSING LOOP
         # ============================
@@ -231,6 +262,7 @@ class TargetWordEvaluator:
         # Initialize progress tracking
         total_mcids = len(data)
         initial_resolved = len(predictions)
+        # start_time already initialized above to fix checkpoint resume bug
         
         # Create progress bar with meaningful description
         progress_bar = tqdm(
@@ -256,13 +288,14 @@ class TargetWordEvaluator:
                 # Only increment batch_count for new batches, not retries
                 # Create a unique key for this batch composition to detect retries
                 is_retry = False
-                batch_key = str(sorted([(mcid, tries) for mcid, tries in batch_items]))
-                if hasattr(self, '_last_batch_key') and self._last_batch_key == batch_key:
+                # Use hash for efficient comparison (fixes performance issue)
+                batch_key_hash = hash(tuple(sorted((mcid, tries) for mcid, tries in batch_items)))
+                if self._last_batch_key == batch_key_hash:
                     is_retry = True
                     logger.debug(f"Retrying previous batch (batch {batch_count})")
                 else:
                     batch_count += 1
-                    self._last_batch_key = batch_key
+                    self._last_batch_key = batch_key_hash
                     logger.debug(f"Starting new batch {batch_count}")
                     
                 # Update progress bar description with current batch info
@@ -373,7 +406,7 @@ class TargetWordEvaluator:
                     if batch_count % checkpoint_every == 0:
                         self._save_checkpoint(
                             checkpoint_file, pending_mcids, predictions, 
-                            generation_details, batch_count, target_words, n_samples
+                            generation_details, batch_count, target_words, n_samples, max_tokens
                         )
                         logger.info(f"Checkpoint saved after batch {batch_count}")
                     
@@ -399,6 +432,19 @@ class TargetWordEvaluator:
                         logger.debug(f"Cleaned up old failure tracking for {oldest_key}")
                     
                     max_batch_retries = self.target_config.get('max_batch_retries', 3)
+                    global_timeout_minutes = self.target_config.get('global_timeout_minutes', 30)
+                    
+                    # FIXED: Add circuit breaker to prevent infinite retries
+                    max_batches = self.target_config.get('max_batches', 10000)  # Configurable limit
+                    if batch_count > max_batches:
+                        logger.error(f"Safety limit reached: {batch_count} batches processed (max: {max_batches}). Aborting.")
+                        break
+                    
+                    # FIXED: Check global timeout
+                    elapsed_time = time.time() - start_time
+                    if elapsed_time > global_timeout_minutes * 60:
+                        logger.error(f"Global timeout ({global_timeout_minutes}m) exceeded. Aborting.")
+                        break
                     
                     if self._batch_failures[batch_failure_key] <= max_batch_retries:
                         # RETRY: Keep MCIDs in pending for another attempt
@@ -409,8 +455,11 @@ class TargetWordEvaluator:
                         # FINAL FAILURE: Only now mark MCIDs as failed after exhausting retries
                         logger.error(f"Batch {batch_count} failed permanently after {max_batch_retries} retries")
                     
+                    # FIXED: Simplified error handling - fail fast on persistent API issues
+                    logger.error(f"Marking batch MCIDs as failed due to persistent API issues: {[mcid for mcid, _ in batch_mcid_info]}")
+                    
                     for mcid, try_number in batch_mcid_info:
-                        # Track error in generation details but don't immediately mark as negative
+                        # Initialize if needed
                         if mcid not in generation_details:
                             row_data = mcid_to_data[mcid]
                             generation_details[mcid] = {
@@ -421,7 +470,7 @@ class TargetWordEvaluator:
                                 'samples': [],
                                 'total_tries': 0,
                                 'resolved_at_try': None,
-                                'resolution_reason': 'max_retries_exceeded'
+                                'resolution_reason': 'api_error'
                             }
                         
                         # Add error sample
@@ -430,24 +479,16 @@ class TargetWordEvaluator:
                             'generated_text': None,
                             'any_word_found': False,
                             'word_matches': {word: False for word in target_words},
-                            'error': f"Batch failed after {max_batch_retries} retries: {str(e)}"
+                            'error': f"API failed after {max_batch_retries} retries: {str(e)}"
                         })
                         generation_details[mcid]['total_tries'] = try_number
                         
-                        # Check if this MCID has reached max individual tries, or if we should mark as failed due to persistent API issues
-                        max_individual_fails = self.target_config.get('max_individual_api_failures', 5)
-                        api_failure_count = sum(1 for sample in generation_details[mcid]['samples'] if 'error' in sample)
-                        
-                        if try_number >= n_samples or api_failure_count >= max_individual_fails:
-                            # Mark as negative and remove from pending
-                            predictions[mcid] = 0
-                            generation_details[mcid]['predicted_label'] = 0
-                            generation_details[mcid]['resolved_at_try'] = try_number
-                            generation_details[mcid]['resolution_reason'] = 'api_error' if api_failure_count >= max_individual_fails else 'max_tries_reached'
-                            pending_mcids.pop(mcid, None)
-                        else:
-                            # Keep trying but increment failure count
-                            pending_mcids[mcid] = try_number
+                        # FIXED: Fail fast - mark as negative and remove from pending
+                        predictions[mcid] = 0
+                        generation_details[mcid]['predicted_label'] = 0
+                        generation_details[mcid]['resolved_at_try'] = try_number
+                        generation_details[mcid]['resolution_reason'] = 'api_error'
+                        pending_mcids.pop(mcid, None)
         
         finally:
             # Ensure progress bar is always closed
@@ -472,24 +513,42 @@ class TargetWordEvaluator:
         
         # CLEANUP: Remove checkpoint file on successful completion
         if checkpoint_file.exists():
-            checkpoint_file.unlink()
-            logger.info("Checkpoint file removed after successful completion")
+            try:
+                checkpoint_file.unlink()
+                logger.info("Checkpoint file removed after successful completion")
+            except Exception as e:
+                logger.warning(f"Failed to remove checkpoint file: {e}")
         
-        # Memory optimization: Clear large intermediate structures
-        del mcid_to_data  # Clear the lookup dictionary
+        # FIXED: Enhanced memory cleanup
+        try:
+            del mcid_to_data  # Clear the lookup dictionary
+        except:
+            pass
+        
         if hasattr(self, '_batch_failures'):
-            del self._batch_failures  # Clear batch failure tracking
+            try:
+                del self._batch_failures  # Clear batch failure tracking
+            except:
+                pass
+        
+        if hasattr(self, '_last_batch_key'):
+            try:
+                del self._last_batch_key  # Clear batch tracking
+            except:
+                pass
         
         # Validate results before finalizing
         self._validate_results(predictions, generation_details, data)
         
         # Create ordered results matching original data order
         final_predictions = []
-        final_details = []
+        # FIXED: Keep generation_details as dict for consistency
+        final_details_dict = {}
         
         for _, row in data.iterrows():
             mcid = row['mcid']
-            final_predictions.append(predictions.get(mcid, 0))  # Default to negative if missing
+            # Ensure consistent int type (fixes type consistency issue)
+            final_predictions.append(int(predictions.get(mcid, 0)))  # Default to negative if missing
             
             # Add summary statistics to details
             detail = generation_details.get(mcid, {})
@@ -502,29 +561,33 @@ class TargetWordEvaluator:
                 detail['samples_total'] = n_samples
                 detail['early_termination'] = detail.get('resolution_reason') == 'target_found'
             
-            final_details.append(detail)
+            # Store in dict by mcid for consistent structure (keep mcid as string for JSON compatibility)
+            final_details_dict[str(mcid)] = detail
         
-        return np.array(final_predictions), final_details
+        return np.array(final_predictions), final_details_dict
     
     def _generate_cross_mcid_batch(self, endpoint: str, batch_prompts: List[str], 
                                  max_tokens: int, batch_mcid_info: List[tuple]) -> List[str]:
         """Generate one sample for each prompt in the batch (cross-MCID optimization)."""
         # Create batch payload - one generation per prompt with deterministic seeds based on MCID and try
+        # FIXED: Use 'claims' instead of 'prompts' to match API spec
         batch_payload = {
-            'prompts': batch_prompts,
+            'claims': batch_prompts,
             'max_new_tokens': max_tokens,
             'temperature': self.target_config.get('temperature', 0.8),
-            'top_k': self.target_config.get('top_k', 50),
-            # Use deterministic but unique seeds based on MCID and try number to avoid collisions on resume
-            'seeds': [hash(f"{mcid}_{try_number}") % (2**32) for mcid, try_number in batch_mcid_info]
+            'top_k': self.target_config.get('top_k', 50)
         }
         
-        for attempt in range(self.model_config['max_retries']):
+        # FIXED: Use defaults if config values missing
+        max_retries = self.model_config.get('max_retries', 3)
+        timeout = self.model_config.get('timeout', 30)
+        
+        for attempt in range(max_retries):
             try:
                 response = requests.post(
                     endpoint,
                     json=batch_payload,
-                    timeout=self.model_config['timeout']
+                    timeout=timeout
                 )
                 response.raise_for_status()
                 
@@ -538,12 +601,19 @@ class TargetWordEvaluator:
                 if not isinstance(result, dict):
                     raise ValueError(f"Expected JSON object response, got {type(result)}")
                 
-                if 'generated_claims' not in result:
-                    raise ValueError(f"Missing 'generated_claims' field in API response. Available fields: {list(result.keys())}")
+                # FIXED: Check for multiple possible response field names to match API
+                response_field = None
+                for field_name in ['generated_claims', 'results', 'generated_text', 'outputs']:
+                    if field_name in result:
+                        response_field = field_name
+                        break
                 
-                generated_texts_response = result['generated_claims']
+                if response_field is None:
+                    raise ValueError(f"No recognized response field found. Available fields: {list(result.keys())}")
+                
+                generated_texts_response = result[response_field]
                 if not isinstance(generated_texts_response, list):
-                    raise ValueError(f"Expected 'generated_claims' to be a list, got {type(generated_texts_response)}")
+                    raise ValueError(f"Expected '{response_field}' to be a list, got {type(generated_texts_response)}")
                 
                 # Validate response length matches request
                 expected_count = len(batch_prompts)
@@ -580,7 +650,7 @@ class TargetWordEvaluator:
                 
             except requests.exceptions.RequestException as e:
                 logger.warning(f"Cross-MCID batch API call failed (attempt {attempt + 1}): {e}")
-                if attempt == self.model_config['max_retries'] - 1:
+                if attempt == max_retries - 1:
                     raise
     
     def _check_word_presence(self, text: str, target_words: List[str]) -> Dict[str, bool]:
@@ -632,10 +702,12 @@ class TargetWordEvaluator:
         return metrics
     
     def _save_results(self, data: pd.DataFrame, predictions: np.ndarray,
-                     generation_details: List[Dict], metrics: Dict[str, Any],
+                     generation_details: Dict[str, Dict], metrics: Dict[str, Any],
                      target_words: List[str]) -> str:
         """Save detailed evaluation results."""
-        output_dir = Path(self.output_config['metrics_dir']) / 'target_word_evaluation'
+        # FIXED: Use default if metrics_dir not in config
+        metrics_dir = self.output_config.get('metrics_dir', 'outputs/metrics')
+        output_dir = Path(metrics_dir) / 'target_word_evaluation'
         output_dir.mkdir(parents=True, exist_ok=True)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -670,7 +742,7 @@ class TargetWordEvaluator:
         return str(summary_path)
     
     def _load_checkpoint(self, checkpoint_file: Path, data: pd.DataFrame, 
-                        target_words: List[str], n_samples: int) -> Tuple[Dict, Dict, Dict, int]:
+                        target_words: List[str], n_samples: int, max_tokens: int = None) -> Tuple[Dict, Dict, Dict, int]:
         """
         Load checkpoint data if available and compatible.
         
@@ -686,10 +758,17 @@ class TargetWordEvaluator:
             with open(checkpoint_file, 'r') as f:
                 checkpoint_data = json.load(f)
             
-            # Validate checkpoint compatibility
-            if (checkpoint_data.get('target_words') != target_words or
-                checkpoint_data.get('n_samples') != n_samples):
-                logger.warning("Checkpoint incompatible with current parameters - starting fresh")
+            # Validate checkpoint compatibility - enhanced checks
+            incompatible_reasons = []
+            if checkpoint_data.get('target_words') != target_words:
+                incompatible_reasons.append(f"target_words mismatch: {checkpoint_data.get('target_words')} != {target_words}")
+            if checkpoint_data.get('n_samples') != n_samples:
+                incompatible_reasons.append(f"n_samples mismatch: {checkpoint_data.get('n_samples')} != {n_samples}")
+            if max_tokens is not None and checkpoint_data.get('max_tokens') != max_tokens:
+                incompatible_reasons.append(f"max_tokens mismatch: {checkpoint_data.get('max_tokens')} != {max_tokens}")
+                
+            if incompatible_reasons:
+                logger.warning(f"Checkpoint incompatible - starting fresh. Reasons: {'; '.join(incompatible_reasons)}")
                 pending_mcids = {row['mcid']: 0 for _, row in data.iterrows()}
                 return pending_mcids, {}, {}, 0
             
@@ -720,13 +799,14 @@ class TargetWordEvaluator:
     
     def _save_checkpoint(self, checkpoint_file: Path, pending_mcids: Dict, 
                         predictions: Dict, generation_details: Dict, batch_count: int,
-                        target_words: List[str], n_samples: int):
+                        target_words: List[str], n_samples: int, max_tokens: int = None):
         """Save current progress to checkpoint file."""
         try:
             checkpoint_data = {
                 'timestamp': datetime.now().isoformat(),
                 'target_words': target_words,  # Use actual parameter, not config
                 'n_samples': n_samples,  # Use actual parameter, not config
+                'max_tokens': max_tokens,  # FIXED: Include max_tokens for compatibility check
                 'pending_mcids': pending_mcids,
                 'predictions': predictions,
                 'generation_details': generation_details,

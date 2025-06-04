@@ -1,5 +1,0 @@
-mcid,true_label,predicted_label,correct
-MC001,1,0,False
-MC002,0,0,True
-MC003,1,0,False
-MC004,0,0,True
