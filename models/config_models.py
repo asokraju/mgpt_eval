@@ -110,6 +110,17 @@ class HyperparameterConfig(BaseModel):
             "min_samples_leaf": [1, 2]
         }
     )
+    
+    def model_post_init(self, __context):
+        """Post-process to convert 'null' strings to None."""
+        for classifier_name in ['logistic_regression', 'svm', 'random_forest']:
+            if hasattr(self, classifier_name):
+                classifier_params = getattr(self, classifier_name)
+                for param_name, param_values in classifier_params.items():
+                    # Convert 'null' strings to None
+                    classifier_params[param_name] = [
+                        None if v == 'null' else v for v in param_values
+                    ]
 
 
 class CrossValidationConfig(BaseModel):
@@ -157,7 +168,12 @@ class ClassificationInputConfig(BaseModel):
 class InputConfig(BaseModel):
     """Configuration for input data sources."""
     
-    dataset_path: str = Field(..., description="Path to input CSV dataset")
+    # For embedding pipeline
+    dataset_path: Optional[str] = Field(default=None, description="Path to input CSV dataset")
+    
+    # For classification pipeline  
+    train_embeddings_path: Optional[str] = Field(default=None, description="Path to training embeddings CSV")
+    test_embeddings_path: Optional[str] = Field(default=None, description="Path to test embeddings CSV")
 
 
 

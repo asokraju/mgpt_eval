@@ -1,6 +1,14 @@
 # TODO
 
-## Current Tasks - Population Health Analytics with VAE (June 4, 2025)
+## Current Tasks - Pure Config-Driven Pipeline Implementation (June 5, 2025)
+
+### ✅ Classification Pipeline Config-Driven Implementation (COMPLETED)
+- [x] Analyze existing classification pipeline structure
+- [x] Update config models for classification pipeline
+- [x] Update classification pipeline to use pure config approach
+- [x] Create clean classification config YAML with variable references
+- [x] Create classification pipeline notebook example
+- [x] Test classification pipeline with dummy embeddings data
 
 ### Critical - Memory Issues
 - [x] Investigate JavaScript heap out of memory error 

@@ -1,0 +1,28 @@
+{
+  "job_name": "binary_classification_example",
+  "classifier_type": "logistic_regression",
+  "best_params": {
+    "C": 0.01,
+    "penalty": "l2",
+    "solver": "lbfgs"
+  },
+  "test_metrics": {
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "confusion_matrix": [
+      [
+        2,
+        0
+      ],
+      [
+        0,
+        2
+      ]
+    ],
+    "roc_auc": 1.0
+  },
+  "timestamp": "2025-06-05T13:56:45.717133",
+  "pipeline_version": "1.0.0"
+}

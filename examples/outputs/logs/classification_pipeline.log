@@ -1,0 +1,88 @@
+2025-06-05 13:56:30,406 - classification_pipeline - [32mINFO[0m - Starting binary classification with logistic_regression
+2025-06-05 13:56:30,421 - classification_pipeline - [32mINFO[0m - Loaded 16 training and 4 test samples
+2025-06-05 13:56:30,421 - classification_pipeline - [32mINFO[0m - Feature dimension: 768
+2025-06-05 13:56:30,421 - classification_pipeline - [32mINFO[0m - Training distribution: class_0=8, class_1=8
+2025-06-05 13:56:30,421 - classification_pipeline - [32mINFO[0m - Test distribution: class_0=2, class_1=2
+2025-06-05 13:56:30,422 - classification_pipeline - [32mINFO[0m - Starting grid search...
+2025-06-05 13:56:31,325 - classification_pipeline - [32mINFO[0m - Best params: {'C': 0.01, 'penalty': 'l2', 'solver': 'lbfgs'}
+2025-06-05 13:56:31,325 - classification_pipeline - [32mINFO[0m - Best CV score: 0.8000
+2025-06-05 13:56:31,331 - classification_pipeline - [32mINFO[0m - Test metrics: Acc=1.0000, F1=1.0000, AUC=1.0
+2025-06-05 13:56:31,332 - classification_pipeline - [32mINFO[0m - Model saved: examples/outputs/models/binary_classification_example_logistic_regression/logistic_regression_model_20250605_135631.pkl
+2025-06-05 13:56:31,332 - classification_pipeline - [32mINFO[0m - Metrics saved: examples/outputs/models/binary_classification_example_logistic_regression/logistic_regression_metrics_20250605_135631.json
+2025-06-05 13:56:43,276 - classification_pipeline - [32mINFO[0m - Starting binary classification with logistic_regression
+2025-06-05 13:56:43,288 - classification_pipeline - [32mINFO[0m - Loaded 16 training and 4 test samples
+2025-06-05 13:56:43,288 - classification_pipeline - [32mINFO[0m - Feature dimension: 768
+2025-06-05 13:56:43,288 - classification_pipeline - [32mINFO[0m - Training distribution: class_0=8, class_1=8
+2025-06-05 13:56:43,288 - classification_pipeline - [32mINFO[0m - Test distribution: class_0=2, class_1=2
+2025-06-05 13:56:43,289 - classification_pipeline - [32mINFO[0m - Starting grid search...
+2025-06-05 13:56:45,712 - classification_pipeline - [32mINFO[0m - Best params: {'C': 0.01, 'penalty': 'l2', 'solver': 'lbfgs'}
+2025-06-05 13:56:45,712 - classification_pipeline - [32mINFO[0m - Best CV score: 0.8000
+2025-06-05 13:56:45,716 - classification_pipeline - [32mINFO[0m - Test metrics: Acc=1.0000, F1=1.0000, AUC=1.0
+2025-06-05 13:56:45,717 - classification_pipeline - [32mINFO[0m - Model saved: examples/outputs/models/binary_classification_example_logistic_regression/logistic_regression_model_20250605_135645.pkl
+2025-06-05 13:56:45,717 - classification_pipeline - [32mINFO[0m - Metrics saved: examples/outputs/models/binary_classification_example_logistic_regression/logistic_regression_metrics_20250605_135645.json
+2025-06-05 13:56:45,719 - classification_pipeline - [32mINFO[0m - Starting binary classification with svm
+2025-06-05 13:56:45,728 - classification_pipeline - [32mINFO[0m - Loaded 16 training and 4 test samples
+2025-06-05 13:56:45,728 - classification_pipeline - [32mINFO[0m - Feature dimension: 768
+2025-06-05 13:56:45,728 - classification_pipeline - [32mINFO[0m - Training distribution: class_0=8, class_1=8
+2025-06-05 13:56:45,728 - classification_pipeline - [32mINFO[0m - Test distribution: class_0=2, class_1=2
+2025-06-05 13:56:45,729 - classification_pipeline - [32mINFO[0m - Starting grid search...
+2025-06-05 13:56:46,463 - classification_pipeline - [32mINFO[0m - Best params: {'C': 1, 'gamma': 'auto', 'kernel': 'rbf'}
+2025-06-05 13:56:46,463 - classification_pipeline - [32mINFO[0m - Best CV score: 1.0000
+2025-06-05 13:56:46,466 - classification_pipeline - [32mINFO[0m - Test metrics: Acc=1.0000, F1=1.0000, AUC=0.0
+2025-06-05 13:56:46,467 - classification_pipeline - [32mINFO[0m - Model saved: examples/outputs/models/binary_classification_example_svm/svm_model_20250605_135646.pkl
+2025-06-05 13:56:46,467 - classification_pipeline - [32mINFO[0m - Metrics saved: examples/outputs/models/binary_classification_example_svm/svm_metrics_20250605_135646.json
+2025-06-05 13:56:46,468 - classification_pipeline - [32mINFO[0m - Starting binary classification with random_forest
+2025-06-05 13:56:46,477 - classification_pipeline - [32mINFO[0m - Loaded 16 training and 4 test samples
+2025-06-05 13:56:46,477 - classification_pipeline - [32mINFO[0m - Feature dimension: 768
+2025-06-05 13:56:46,477 - classification_pipeline - [32mINFO[0m - Training distribution: class_0=8, class_1=8
+2025-06-05 13:56:46,477 - classification_pipeline - [32mINFO[0m - Test distribution: class_0=2, class_1=2
+2025-06-05 13:56:46,478 - classification_pipeline - [32mINFO[0m - Starting grid search...
+2025-06-05 13:56:47,253 - classification_pipeline - [32mINFO[0m - Best params: {'max_depth': 10, 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 200}
+2025-06-05 13:56:47,254 - classification_pipeline - [32mINFO[0m - Best CV score: 1.0000
+2025-06-05 13:56:47,264 - classification_pipeline - [32mINFO[0m - Test metrics: Acc=1.0000, F1=1.0000, AUC=1.0
+2025-06-05 13:56:47,269 - classification_pipeline - [32mINFO[0m - Model saved: examples/outputs/models/binary_classification_example_random_forest/random_forest_model_20250605_135647.pkl
+2025-06-05 13:56:47,269 - classification_pipeline - [32mINFO[0m - Metrics saved: examples/outputs/models/binary_classification_example_random_forest/random_forest_metrics_20250605_135647.json
+2025-06-05 14:01:22,416 - classification_pipeline - [32mINFO[0m - Starting binary classification with random_forest
+2025-06-05 14:01:22,426 - classification_pipeline - [32mINFO[0m - Loaded 16 training and 4 test samples
+2025-06-05 14:01:22,426 - classification_pipeline - [32mINFO[0m - Feature dimension: 768
+2025-06-05 14:01:22,426 - classification_pipeline - [32mINFO[0m - Training distribution: class_0=8, class_1=8
+2025-06-05 14:01:22,426 - classification_pipeline - [32mINFO[0m - Test distribution: class_0=2, class_1=2
+2025-06-05 14:01:22,427 - classification_pipeline - [32mINFO[0m - Starting grid search...
+2025-06-05 14:01:24,550 - classification_pipeline - [32mINFO[0m - Best params: {'max_depth': 10, 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 200}
+2025-06-05 14:01:24,551 - classification_pipeline - [32mINFO[0m - Best CV score: 1.0000
+2025-06-05 14:01:24,562 - classification_pipeline - [32mINFO[0m - Test metrics: Acc=1.0000, F1=1.0000, AUC=1.0
+2025-06-05 14:01:24,566 - classification_pipeline - [32mINFO[0m - Model saved: examples/outputs/models/binary_classification_example_random_forest/random_forest_model_20250605_140124.pkl
+2025-06-05 14:01:24,566 - classification_pipeline - [32mINFO[0m - Metrics saved: examples/outputs/models/binary_classification_example_random_forest/random_forest_metrics_20250605_140124.json
+2025-06-05 14:02:57,323 - classification_pipeline - [32mINFO[0m - Starting binary classification with logistic_regression
+2025-06-05 14:02:57,334 - classification_pipeline - [32mINFO[0m - Loaded 16 training and 4 test samples
+2025-06-05 14:02:57,334 - classification_pipeline - [32mINFO[0m - Feature dimension: 768
+2025-06-05 14:02:57,334 - classification_pipeline - [32mINFO[0m - Training distribution: class_0=8, class_1=8
+2025-06-05 14:02:57,334 - classification_pipeline - [32mINFO[0m - Test distribution: class_0=2, class_1=2
+2025-06-05 14:02:57,335 - classification_pipeline - [32mINFO[0m - Starting grid search...
+2025-06-05 14:02:58,518 - classification_pipeline - [32mINFO[0m - Best params: {'C': 0.01, 'penalty': 'l2', 'solver': 'lbfgs'}
+2025-06-05 14:02:58,519 - classification_pipeline - [32mINFO[0m - Best CV score: 0.8000
+2025-06-05 14:02:58,522 - classification_pipeline - [32mINFO[0m - Test metrics: Acc=1.0000, F1=1.0000, AUC=1.0
+2025-06-05 14:02:58,523 - classification_pipeline - [32mINFO[0m - Model saved: examples/outputs/models/binary_classification_example_logistic_regression/logistic_regression_model_20250605_140258.pkl
+2025-06-05 14:02:58,523 - classification_pipeline - [32mINFO[0m - Metrics saved: examples/outputs/models/binary_classification_example_logistic_regression/logistic_regression_metrics_20250605_140258.json
+2025-06-05 14:02:58,524 - classification_pipeline - [32mINFO[0m - Starting binary classification with svm
+2025-06-05 14:02:58,533 - classification_pipeline - [32mINFO[0m - Loaded 16 training and 4 test samples
+2025-06-05 14:02:58,533 - classification_pipeline - [32mINFO[0m - Feature dimension: 768
+2025-06-05 14:02:58,533 - classification_pipeline - [32mINFO[0m - Training distribution: class_0=8, class_1=8
+2025-06-05 14:02:58,533 - classification_pipeline - [32mINFO[0m - Test distribution: class_0=2, class_1=2
+2025-06-05 14:02:58,534 - classification_pipeline - [32mINFO[0m - Starting grid search...
+2025-06-05 14:02:59,204 - classification_pipeline - [32mINFO[0m - Best params: {'C': 1, 'gamma': 'auto', 'kernel': 'rbf'}
+2025-06-05 14:02:59,205 - classification_pipeline - [32mINFO[0m - Best CV score: 1.0000
+2025-06-05 14:02:59,208 - classification_pipeline - [32mINFO[0m - Test metrics: Acc=1.0000, F1=1.0000, AUC=0.0
+2025-06-05 14:02:59,209 - classification_pipeline - [32mINFO[0m - Model saved: examples/outputs/models/binary_classification_example_svm/svm_model_20250605_140259.pkl
+2025-06-05 14:02:59,209 - classification_pipeline - [32mINFO[0m - Metrics saved: examples/outputs/models/binary_classification_example_svm/svm_metrics_20250605_140259.json
+2025-06-05 14:02:59,209 - classification_pipeline - [32mINFO[0m - Starting binary classification with random_forest
+2025-06-05 14:02:59,218 - classification_pipeline - [32mINFO[0m - Loaded 16 training and 4 test samples
+2025-06-05 14:02:59,218 - classification_pipeline - [32mINFO[0m - Feature dimension: 768
+2025-06-05 14:02:59,218 - classification_pipeline - [32mINFO[0m - Training distribution: class_0=8, class_1=8
+2025-06-05 14:02:59,218 - classification_pipeline - [32mINFO[0m - Test distribution: class_0=2, class_1=2
+2025-06-05 14:02:59,219 - classification_pipeline - [32mINFO[0m - Starting grid search...
+2025-06-05 14:03:00,031 - classification_pipeline - [32mINFO[0m - Best params: {'max_depth': 10, 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 200}
+2025-06-05 14:03:00,031 - classification_pipeline - [32mINFO[0m - Best CV score: 1.0000
+2025-06-05 14:03:00,042 - classification_pipeline - [32mINFO[0m - Test metrics: Acc=1.0000, F1=1.0000, AUC=1.0
+2025-06-05 14:03:00,045 - classification_pipeline - [32mINFO[0m - Model saved: examples/outputs/models/binary_classification_example_random_forest/random_forest_model_20250605_140300.pkl
+2025-06-05 14:03:00,045 - classification_pipeline - [32mINFO[0m - Metrics saved: examples/outputs/models/binary_classification_example_random_forest/random_forest_metrics_20250605_140300.json

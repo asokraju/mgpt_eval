@@ -1,22 +1,21 @@
 """
-Binary Classification Pipeline for training classifiers on embeddings.
+Pure Config-Driven Binary Classification Pipeline for training classifiers on embeddings.
 
-Focused implementation for binary classification only with hard failure on errors.
+Simplified implementation for binary classification with config-driven approach.
 """
 
 import json
-import logging
-import yaml
 import pickle
 import time
 from pathlib import Path
-from typing import Dict, Tuple, Any, List, Union
+from typing import Dict, Tuple, Any, List, Union, Optional
 import pandas as pd
 import numpy as np
+from datetime import datetime
 
 from models.config_models import PipelineConfig
-from datetime import datetime
-from sklearn.model_selection import GridSearchCV, StratifiedKFold, ParameterGrid
+from utils.logging_utils import get_logger
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
@@ -27,85 +26,81 @@ from sklearn.metrics import (
 )
 from sklearn.base import clone
 
-logger = logging.getLogger(__name__)
-
 
 class ClassificationPipeline:
-    """Binary classification pipeline for embeddings."""
+    """Pure config-driven binary classification pipeline for embeddings."""
     
-    def __init__(self, config):
+    def __init__(self, config: PipelineConfig):
         """Initialize pipeline with configuration."""
-        # Load config
-        if isinstance(config, str):
-            config_path = Path(config)
-            if not config_path.exists():
-                raise FileNotFoundError(f"Config file not found: {config}")
-            with open(config, 'r') as f:
-                self.config = yaml.safe_load(f)
-        elif isinstance(config, PipelineConfig):
-            # Convert PipelineConfig to dict for backward compatibility
-            self.config = config.model_dump()
-        else:
-            self.config = config
-            
-        if not isinstance(self.config, dict):
-            raise TypeError("Configuration must be a dictionary or PipelineConfig object")
-            
-        if 'classification' not in self.config:
-            raise ValueError("Configuration missing 'classification' section")
-            
-        self.class_config = self.config['classification']
-        self.output_config = self.config.get('output', {})
+        self.config = config
+        
+        # Setup directories first
+        self.config.setup_directories()
+        
+        # Resolve log file path
+        log_config = config.logging
+        log_config.file = config.resolve_template_string(log_config.file)
+        
+        self.logger = get_logger("classification_pipeline", log_config)
         
         # Set random seed
-        self.random_seed = self.config.get('job', {}).get('random_seed', 42)
-        np.random.seed(self.random_seed)
+        np.random.seed(self.config.job.random_seed)
         
         # Initialize classifiers
         self.classifiers = {
             'logistic_regression': LogisticRegression(
                 max_iter=1000, 
-                random_state=self.random_seed
+                random_state=self.config.job.random_seed
             ),
             'svm': SVC(
                 probability=True, 
-                random_state=self.random_seed
+                random_state=self.config.job.random_seed
             ),
             'random_forest': RandomForestClassifier(
-                random_state=self.random_seed
+                random_state=self.config.job.random_seed
             )
         }
     
-    def run(self, train_embeddings: str, test_embeddings: str,
-            classifier_type: str, output_dir: str) -> Dict[str, Any]:
-        """Run the classification pipeline."""
+    def run(self, train_embeddings_path: Optional[str] = None, 
+            test_embeddings_path: Optional[str] = None,
+            classifier_type: Optional[str] = None) -> Dict[str, Any]:
+        """Run the classification pipeline using config paths."""
+        
+        # Use config paths if not provided
+        if train_embeddings_path is None:
+            train_embeddings_path = self.config.resolve_template_string(
+                "${output.embeddings_dir}/train_embeddings.csv"
+            )
+        if test_embeddings_path is None:
+            test_embeddings_path = self.config.resolve_template_string(
+                "${output.embeddings_dir}/test_embeddings.csv"
+            )
+        if classifier_type is None:
+            classifier_type = self.config.classification.models[0]  # Use first model from config
+            
         # Validate inputs
-        train_path = Path(train_embeddings)
-        test_path = Path(test_embeddings)
-        output_path = Path(output_dir)
+        train_path = Path(train_embeddings_path)
+        test_path = Path(test_embeddings_path)
         
         if not train_path.exists():
-            raise FileNotFoundError(f"Training file not found: {train_embeddings}")
+            raise FileNotFoundError(f"Training file not found: {train_embeddings_path}")
         if not test_path.exists():
-            raise FileNotFoundError(f"Test file not found: {test_embeddings}")
+            raise FileNotFoundError(f"Test file not found: {test_embeddings_path}")
         if classifier_type not in self.classifiers:
             raise ValueError(f"Invalid classifier: {classifier_type}. Must be one of {list(self.classifiers.keys())}")
             
-        # Create output directory and test writability early
-        try:
-            output_path.mkdir(parents=True, exist_ok=True)
-            # Test write permissions
-            test_file = output_path / '.write_test'
-            test_file.touch()
-            test_file.unlink()
-        except Exception as e:
-            raise RuntimeError(f"Cannot write to output directory {output_dir}: {e}")
+        # Create output directory
+        models_dir = self.config.resolve_template_string(
+            "${job.output_dir}/models/${job.name}_{classifier_type}"
+        ).replace("{classifier_type}", classifier_type)
+        output_path = Path(models_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
         
-        logger.info(f"Starting binary classification with {classifier_type}")
+        self.logger.info(f"Starting binary classification with {classifier_type}")
         
         # Load data
-        X_train, y_train, train_metadata = self._load_embeddings(train_embeddings)
-        X_test, y_test, test_metadata = self._load_embeddings(test_embeddings)
+        X_train, y_train = self._load_embeddings(train_embeddings_path)
+        X_test, y_test = self._load_embeddings(test_embeddings_path)
         
         # Validate binary classification
         train_classes = np.unique(y_train)
@@ -120,10 +115,10 @@ class ClassificationPipeline:
         if X_train.shape[1] != X_test.shape[1]:
             raise ValueError(f"Feature dimension mismatch: train={X_train.shape[1]}, test={X_test.shape[1]}")
             
-        logger.info(f"Loaded {len(X_train)} training and {len(X_test)} test samples")
-        logger.info(f"Feature dimension: {X_train.shape[1]}")
-        logger.info(f"Training distribution: class_0={np.sum(y_train==0)}, class_1={np.sum(y_train==1)}")
-        logger.info(f"Test distribution: class_0={np.sum(y_test==0)}, class_1={np.sum(y_test==1)}")
+        self.logger.info(f"Loaded {len(X_train)} training and {len(X_test)} test samples")
+        self.logger.info(f"Feature dimension: {X_train.shape[1]}")
+        self.logger.info(f"Training distribution: class_0={np.sum(y_train==0)}, class_1={np.sum(y_train==1)}")
+        self.logger.info(f"Test distribution: class_0={np.sum(y_test==0)}, class_1={np.sum(y_test==1)}")
         
         # Check class imbalance
         train_counts = np.bincount(y_train)
@@ -132,12 +127,13 @@ class ClassificationPipeline:
         imbalance_ratio = max(train_counts) / min(train_counts)
         use_balanced = imbalance_ratio > 3
         if use_balanced:
-            logger.info(f"Class imbalance detected (ratio {imbalance_ratio:.2f}), using balanced weights")
+            self.logger.info(f"Class imbalance detected (ratio {imbalance_ratio:.2f}), using balanced weights")
         
         # Check minimum samples for CV
         min_class_count = min(train_counts)
-        if min_class_count < 5:
-            raise ValueError(f"Not enough samples for 5-fold CV. Minority class has only {min_class_count} samples")
+        if min_class_count < self.config.classification.cross_validation.n_folds:
+            raise ValueError(f"Not enough samples for {self.config.classification.cross_validation.n_folds}-fold CV. "
+                           f"Minority class has only {min_class_count} samples")
         
         # Scale features
         scaler = StandardScaler()
@@ -165,18 +161,20 @@ class ClassificationPipeline:
         # Save model
         model_path = self._save_model(
             best_model, scaler, classifier_type, best_params, 
-            test_metrics, output_dir
+            test_metrics, models_dir
         )
         
         return {
             'model_path': model_path,
             'best_params': best_params,
             'best_cv_score': best_score,
-            'test_metrics': test_metrics
+            'test_metrics': test_metrics,
+            'classifier_type': classifier_type,
+            'timestamp': datetime.now().isoformat()
         }
     
-    def _load_embeddings(self, filepath: str) -> Tuple[np.ndarray, np.ndarray, Dict]:
-        """Load embeddings from CSV. Fails on any invalid data."""
+    def _load_embeddings(self, filepath: str) -> Tuple[np.ndarray, np.ndarray]:
+        """Load embeddings from CSV."""
         try:
             df = pd.read_csv(filepath)
         except Exception as e:
@@ -187,7 +185,7 @@ class ClassificationPipeline:
             raise ValueError(f"CSV file is empty: {filepath}")
         
         # Validate columns
-        required_cols = ['embedding', 'label', 'mcid']
+        required_cols = ['embedding', 'label']
         missing = [c for c in required_cols if c not in df.columns]
         if missing:
             raise ValueError(f"Missing required columns in {filepath}: {missing}")
@@ -197,7 +195,7 @@ class ClassificationPipeline:
         if null_counts.any():
             raise ValueError(f"Found null values in {filepath}: {null_counts[null_counts > 0].to_dict()}")
         
-        # Parse embeddings more efficiently
+        # Parse embeddings
         embeddings = []
         embedding_dim = None
         
@@ -206,8 +204,6 @@ class ClassificationPipeline:
                 emb = json.loads(emb_str)
             except json.JSONDecodeError as e:
                 raise ValueError(f"Row {idx} in {filepath}: invalid JSON - {e}")
-            except Exception as e:
-                raise ValueError(f"Row {idx} in {filepath}: unexpected error parsing embedding - {e}")
                 
             if not isinstance(emb, list):
                 raise ValueError(f"Row {idx} in {filepath}: embedding must be a list, got {type(emb)}")
@@ -240,10 +236,6 @@ class ClassificationPipeline:
         except Exception as e:
             raise ValueError(f"Failed to convert embeddings to numpy array: {e}")
         
-        # Final validation
-        if embeddings.shape[0] != len(df):
-            raise ValueError(f"Embedding array size mismatch: {embeddings.shape[0]} vs {len(df)}")
-        
         # Parse labels
         try:
             labels = df['label'].astype(np.int32).values
@@ -255,88 +247,60 @@ class ClassificationPipeline:
         if not all(l in [0, 1] for l in unique_labels):
             raise ValueError(f"Labels must be binary [0,1] in {filepath}, found: {unique_labels}")
         
-        metadata = {'mcids': df['mcid'].tolist()}
-        
-        return embeddings, labels, metadata
+        return embeddings, labels
     
     def _train_classifier(self, X_train: np.ndarray, y_train: np.ndarray, 
                          classifier_type: str, use_balanced: bool) -> Tuple[Any, Dict, float]:
-        """Train classifier with grid search."""
+        """Train classifier with grid search using config parameters."""
+        
         # Clone classifier to avoid modifying the original
-        try:
-            classifier = clone(self.classifiers[classifier_type])
-        except Exception as e:
-            raise RuntimeError(f"Failed to clone classifier: {e}")
+        classifier = clone(self.classifiers[classifier_type])
         
         # Apply balanced weights if needed
         if use_balanced and hasattr(classifier, 'class_weight'):
             classifier.set_params(class_weight='balanced')
         
-        # Get hyperparameters
-        param_grid = self._get_hyperparameters(classifier_type)
+        # Get hyperparameters from config
+        param_grid = getattr(self.config.classification.hyperparameter_search, classifier_type)
         
         # Check for empty parameter grid
         if not param_grid:
             raise ValueError(f"Empty parameter grid for {classifier_type}")
         
-        # Calculate number of parameter combinations correctly
-        if isinstance(param_grid, dict):
-            n_params = np.prod([len(v) for v in param_grid.values()])
-        elif isinstance(param_grid, list):
-            # Handle list of dicts (from _get_hyperparameters or config)
-            n_params = len(param_grid)
-        else:
-            raise ValueError(f"Invalid parameter grid type: {type(param_grid)}")
-            
-        min_samples_per_param = 10  # Heuristic: at least 10 samples per parameter combination
-        if len(y_train) < n_params * min_samples_per_param:
-            logger.warning(f"Limited samples ({len(y_train)}) for {n_params} parameter combinations. "
-                         f"Consider reducing parameter grid complexity.")
-        
-        # Setup cross-validation
+        # Setup cross-validation using config
         cv = StratifiedKFold(
-            n_splits=5,
+            n_splits=self.config.classification.cross_validation.n_folds,
             shuffle=True,
-            random_state=self.random_seed
+            random_state=self.config.job.random_seed
         )
         
-        # Grid search
+        # Grid search using config
         grid_search = GridSearchCV(
             classifier,
             param_grid,
             cv=cv,
-            scoring='roc_auc',
-            n_jobs=-1,
+            scoring=self.config.classification.cross_validation.scoring,
+            n_jobs=self.config.classification.cross_validation.n_jobs,
             verbose=1,
-            error_score='raise',  # Fail immediately on any error
+            error_score='raise',
             refit=True
         )
         
-        logger.info("Starting grid search...")
+        self.logger.info("Starting grid search...")
         try:
             grid_search.fit(X_train, y_train)
-        except ValueError as e:
-            if "Solver" in str(e) and "supports only" in str(e):
-                raise ValueError(f"Invalid solver/penalty combination for logistic regression: {e}")
-            raise RuntimeError(f"Grid search failed: {e}")
         except Exception as e:
             raise RuntimeError(f"Grid search failed: {e}")
         
-        # Validate grid search results
-        if not hasattr(grid_search, 'cv_results_'):
-            raise RuntimeError("Grid search did not complete - no cv_results_ found")
-        
+        # Validate results
         if not hasattr(grid_search, 'best_estimator_') or grid_search.best_estimator_ is None:
             raise RuntimeError("Grid search failed to find a valid model")
-        
-        if not hasattr(grid_search, 'best_params_') or grid_search.best_params_ is None:
-            raise RuntimeError("Grid search failed to find best parameters")
         
         if grid_search.best_score_ <= 0:
             raise RuntimeError(f"Grid search produced invalid best score: {grid_search.best_score_}")
         
-        logger.info(f"Best params: {grid_search.best_params_}")
-        logger.info(f"Best CV score: {grid_search.best_score_:.4f}")
+        self.logger.info(f"Best params: {grid_search.best_params_}")
+        self.logger.info(f"Best CV score: {grid_search.best_score_:.4f}")
         
         return grid_search.best_estimator_, grid_search.best_params_, grid_search.best_score_
     
@@ -347,14 +311,6 @@ class ClassificationPipeline:
             y_pred = model.predict(X_test)
         except Exception as e:
             raise RuntimeError(f"Model prediction failed: {e}")
-        
-        # Validate predictions
-        if len(y_pred) != len(y_test):
-            raise RuntimeError(f"Prediction length mismatch: {len(y_pred)} vs {len(y_test)}")
-        
-        unique_preds = np.unique(y_pred)
-        if not all(p in [0, 1] for p in unique_preds):
-            raise RuntimeError(f"Model produced non-binary predictions: {unique_preds}")
         
         # Basic metrics
         try:
@@ -384,25 +340,26 @@ class ClassificationPipeline:
                     y_scores = model.decision_function(X_test)
                     metrics['roc_auc'] = roc_auc_score(y_test, y_scores)
                 else:
-                    logger.warning("Model does not support probability predictions, skipping ROC-AUC")
+                    self.logger.warning("Model does not support probability predictions, skipping ROC-AUC")
                     metrics['roc_auc'] = None
             except Exception as e:
                 raise RuntimeError(f"Failed to compute ROC-AUC: {e}")
         else:
-            logger.warning("Test set has only one class, skipping ROC-AUC")
+            self.logger.warning("Test set has only one class, skipping ROC-AUC")
             metrics['roc_auc'] = None
         
-        logger.info(f"Test metrics: Acc={metrics['accuracy']:.4f}, "
-                   f"F1={metrics['f1_score']:.4f}, "
-                   f"AUC={metrics.get('roc_auc', 'N/A')}")
+        self.logger.info(f"Test metrics: Acc={metrics['accuracy']:.4f}, "
+                       f"F1={metrics['f1_score']:.4f}, "
+                       f"AUC={metrics.get('roc_auc', 'N/A')}")
         
         return metrics
     
     def _save_model(self, model: Any, scaler: StandardScaler, classifier_type: str,
                    best_params: Dict, test_metrics: Dict, output_dir: str) -> str:
-        """Save model and metadata."""
+        """Save model and metadata using config-derived paths."""
         output_path = Path(output_dir)
-        # Use filesystem-safe timestamp (no colons)
+        
+        # Use config-derived timestamp format
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         # Model package
@@ -413,10 +370,11 @@ class ClassificationPipeline:
             'best_params': best_params,
             'test_metrics': test_metrics,
             'timestamp': datetime.now().isoformat(),
-            'pipeline_version': '1.0.0'
+            'pipeline_version': '1.0.0',
+            'job_name': self.config.job.name
         }
         
-        # Save model
+        # Save model using config naming
         model_file = output_path / f"{classifier_type}_model_{timestamp}.pkl"
         try:
             with open(model_file, 'wb') as f:
@@ -424,15 +382,12 @@ class ClassificationPipeline:
         except Exception as e:
             raise RuntimeError(f"Failed to save model to {model_file}: {e}")
         
-        # Verify the file was saved
-        if not model_file.exists():
-            raise RuntimeError(f"Model file was not created: {model_file}")
-        
-        # Save metrics (for easy inspection without loading pickle)
+        # Save metrics
         metrics_file = output_path / f"{classifier_type}_metrics_{timestamp}.json"
         try:
             with open(metrics_file, 'w') as f:
                 json.dump({
+                    'job_name': self.config.job.name,
                     'classifier_type': classifier_type,
                     'best_params': best_params,
                     'test_metrics': test_metrics,
@@ -447,56 +402,7 @@ class ClassificationPipeline:
                 pass
             raise RuntimeError(f"Failed to save metrics to {metrics_file}: {e}")
         
-        logger.info(f"Model saved: {model_file}")
-        logger.info(f"Metrics saved: {metrics_file}")
+        self.logger.info(f"Model saved: {model_file}")
+        self.logger.info(f"Metrics saved: {metrics_file}")
         
         return str(model_file)
-    
-    def _get_hyperparameters(self, classifier_type: str) -> Union[Dict[str, list], List[Dict[str, Any]]]:
-        """Get hyperparameter grid from config or defaults."""
-        # Try config first
-        config_params = self.class_config.get('hyperparameter_search', {})
-        if classifier_type in config_params:
-            params = config_params[classifier_type]
-            
-            # Validate parameter structure
-            if isinstance(params, dict):
-                for key, values in params.items():
-                    if not isinstance(values, list):
-                        raise ValueError(f"Hyperparameter '{key}' must be a list of values")
-                    if len(values) == 0:
-                        raise ValueError(f"Hyperparameter '{key}' has empty list of values")
-            elif isinstance(params, list):
-                # Support list of parameter combinations from config
-                if len(params) == 0:
-                    raise ValueError(f"Empty parameter list for {classifier_type}")
-                for p in params:
-                    if not isinstance(p, dict):
-                        raise ValueError(f"Each parameter combination must be a dict, got {type(p)}")
-            else:
-                raise ValueError(f"Hyperparameters for {classifier_type} must be a dict or list of dicts")
-                
-            return params
-        
-        # Simplified defaults for binary classification
-        # Using only compatible penalty/solver combinations
-        defaults = {
-            'logistic_regression': {
-                'C': [0.01, 0.1, 1, 10],
-                'penalty': ['l2'],  # Only l2 penalty for simplicity
-                'solver': ['lbfgs']  # lbfgs works well with l2
-            },
-            'svm': {
-                'C': [0.1, 1, 10],
-                'kernel': ['rbf', 'linear'],
-                'gamma': ['scale', 'auto']
-            },
-            'random_forest': {
-                'n_estimators': [100, 200],
-                'max_depth': [10, 20, None],
-                'min_samples_split': [2, 5],
-                'min_samples_leaf': [1, 2]
-            }
-        }
-        
-        return defaults.get(classifier_type, {})

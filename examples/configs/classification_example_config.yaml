@@ -1,126 +1,95 @@
 # =============================================================================
-# CLASSIFICATION PIPELINE EXAMPLE CONFIGURATION
+# CLASSIFICATION PIPELINE CONFIGURATION
 # =============================================================================
-# This configuration demonstrates how to train binary classifiers using
-# pre-generated embeddings from the embedding pipeline.
+# Pure config-driven approach for binary classification with variable references
+# All parameters defined once and referenced throughout the configuration
 
 # =============================================================================
-# INPUT CONFIGURATION - Specify embedding files
-# =============================================================================
-input:
-  # For classification, we use pre-generated embedding files
-  train_embeddings_path: "/home/kosaraju/mgpt_eval/examples/outputs/embeddings/train_embeddings.csv"
-  test_embeddings_path: "/home/kosaraju/mgpt_eval/examples/outputs/embeddings/test_embeddings.csv"
-
-# =============================================================================
-# JOB CONFIGURATION
+# JOB CONFIGURATION - Base settings for the entire pipeline
 # =============================================================================
 job:
-  name: "classification_training_example"
-  output_dir: "/home/kosaraju/mgpt_eval/examples/outputs"
+  name: "binary_classification_example"
+  output_dir: "examples/outputs"
   random_seed: 42
 
 # =============================================================================
-# PIPELINE STAGES - Only classification enabled
+# INPUT CONFIGURATION - Embeddings data sources
 # =============================================================================
-pipeline_stages:
-  embeddings: false          # Skip embedding generation (already done)
-  classification: true       # Train classifiers on embeddings
-  evaluation: true           # Evaluate trained models
-  target_word_eval: false    # Skip target word evaluation
-  summary_report: true       # Generate classification report
-  method_comparison: true    # Compare different classifiers
+input:
+  train_embeddings_path: "${job.output_dir}/embeddings/train_embeddings.csv"
+  test_embeddings_path: "${job.output_dir}/embeddings/test_embeddings.csv"
 
 # =============================================================================
-# CLASSIFICATION CONFIGURATION
+# CLASSIFICATION CONFIGURATION - Core ML settings
 # =============================================================================
 classification:
-  # Classifier types to train and evaluate
   models: ["logistic_regression", "svm", "random_forest"]
+  
+  # Hyperparameter search grids
+  hyperparameter_search:
+    logistic_regression:
+      C: [0.01, 0.1, 1, 10]
+      penalty: ["l2"]
+      solver: ["lbfgs"]
+    
+    svm:
+      C: [0.1, 1, 10]
+      kernel: ["rbf", "linear"]
+      gamma: ["scale", "auto"]
+    
+    random_forest:
+      n_estimators: [100, 200]
+      max_depth: [10, 20, null]
+      min_samples_split: [2, 5]
+      min_samples_leaf: [1, 2]
   
   # Cross-validation settings
   cross_validation:
-    n_folds: 5               # 5-fold cross-validation
-    scoring: "roc_auc"       # Optimize for AUC
-    n_jobs: -1               # Use all available CPU cores
-  
-  # Hyperparameter search grids for each classifier
-  hyperparameter_search:
-    logistic_regression:
-      C: [0.001, 0.01, 0.1, 1, 10, 100]          # Regularization strength
-      penalty: ["l1", "l2"]                        # Regularization type
-      solver: ["liblinear", "saga"]                # Optimization algorithm
-      max_iter: [1000, 2000]                      # Maximum iterations
-    
-    svm:
-      C: [0.1, 1, 10, 100]                        # Regularization parameter
-      kernel: ["rbf", "linear", "poly"]           # Kernel type
-      gamma: ["scale", "auto", 0.001, 0.01]      # Kernel coefficient
-      degree: [2, 3, 4]                           # Polynomial degree (for poly kernel)
-    
-    random_forest:
-      n_estimators: [100, 200, 300, 500]         # Number of trees
-      max_depth: [10, 20, 30, None]              # Maximum tree depth
-      min_samples_split: [2, 5, 10]              # Minimum samples to split
-      min_samples_leaf: [1, 2, 4]                # Minimum samples in leaf
-      max_features: ["sqrt", "log2", None]       # Number of features to consider
+    n_folds: 5
+    scoring: "roc_auc"
+    n_jobs: -1
 
 # =============================================================================
-# EVALUATION CONFIGURATION
-# =============================================================================
-evaluation:
-  # Metrics to compute for model evaluation
-  metrics: ["accuracy", "precision", "recall", "f1_score", "roc_auc", "confusion_matrix"]
-  
-  # Visualization settings
-  visualization:
-    generate_plots: true     # Generate performance plots
-    plot_formats: ["png", "pdf"]  # Save plots in multiple formats
-    dpi: 300                 # High resolution plots
-
-# =============================================================================
-# OUTPUT CONFIGURATION
+# OUTPUT CONFIGURATION - Directory structure using variable references
 # =============================================================================
 output:
-  embeddings_dir: "/home/kosaraju/mgpt_eval/examples/outputs/embeddings"
-  models_dir: "/home/kosaraju/mgpt_eval/examples/outputs/models"
-  metrics_dir: "/home/kosaraju/mgpt_eval/examples/outputs/metrics"
-  logs_dir: "/home/kosaraju/mgpt_eval/examples/outputs/logs"
-  save_best_model_only: false    # Save all trained models
-  model_format: "pickle"          # Serialize models as pickle files
+  embeddings_dir: "${job.output_dir}/embeddings"
+  models_dir: "${job.output_dir}/models"
+  logs_dir: "${job.output_dir}/logs"
 
 # =============================================================================
-# LOGGING CONFIGURATION
+# LOGGING CONFIGURATION - Using template references for log file path
 # =============================================================================
 logging:
   level: "INFO"
   console_level: "INFO"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  file: "/home/kosaraju/mgpt_eval/examples/outputs/logs/classification_pipeline.log"
+  file: "${output.logs_dir}/classification_pipeline.log"
   max_file_size: "10MB"
   backup_count: 5
 
 # =============================================================================
-# EXAMPLE USAGE NOTES
+# CONFIGURATION NOTES
 # =============================================================================
-# This configuration file demonstrates:
-# 1. How to configure multiple classifier types for comparison
-# 2. Comprehensive hyperparameter search grids for optimal performance
-# 3. Cross-validation settings for robust model evaluation
-# 4. Evaluation metrics for binary classification tasks
-# 5. Output organization for model persistence and analysis
+# Variable References Used:
+# - ${job.name} → "binary_classification_example"
+# - ${job.output_dir} → "examples/outputs"
+# - ${output.embeddings_dir} → "examples/outputs/embeddings"
+# - ${output.models_dir} → "examples/outputs/models"
+# - ${output.logs_dir} → "examples/outputs/logs"
+# 
+# Input Files Expected:
+# - train_embeddings.csv: Training embeddings with columns [mcid, label, embedding]
+# - test_embeddings.csv: Test embeddings with columns [mcid, label, embedding]
 #
-# Required Input Files:
-# - Train embeddings: CSV file with columns [mcid, label, embedding]
-# - Test embeddings: CSV file with columns [mcid, label, embedding]
+# Output Structure:
+# - models/: Trained models (.pkl) and metrics (.json) files
+# - logs/: Classification pipeline logs
 #
-# Expected Output:
-# - Trained models saved as pickle files
-# - Performance metrics in JSON format
-# - Evaluation plots (if visualization enabled)
-#
-# Data Flow:
-# 1. Load train_embeddings_path and test_embeddings_path
-# 2. Train classifiers using hyperparameter search
-# 3. Evaluate on test set and save results
-# 4. Generate comparison report across all classifiers
+# Key Features:
+# - Binary classification only (labels: 0, 1)
+# - Multiple classifier types with hyperparameter tuning
+# - Cross-validation with configurable folds and scoring
+# - Automatic class imbalance detection and handling
+# - Comprehensive evaluation metrics (accuracy, precision, recall, F1, ROC-AUC)
+# - Config-driven paths and model naming

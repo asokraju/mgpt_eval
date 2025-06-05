@@ -1,0 +1,28 @@
+{
+  "job_name": "binary_classification_example",
+  "classifier_type": "svm",
+  "best_params": {
+    "C": 1,
+    "gamma": "auto",
+    "kernel": "rbf"
+  },
+  "test_metrics": {
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "confusion_matrix": [
+      [
+        2,
+        0
+      ],
+      [
+        0,
+        2
+      ]
+    ],
+    "roc_auc": 0.0
+  },
+  "timestamp": "2025-06-05T14:02:59.208560",
+  "pipeline_version": "1.0.0"
+}
