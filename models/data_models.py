@@ -96,7 +96,9 @@ class EmbeddingRequest(BaseModel):
     """Request model for embedding generation."""
     
     claims: List[str] = Field(..., min_items=1, description="List of medical claims to embed")
-    batch_size: Optional[int] = Field(default=None, ge=1, le=128, description="Processing batch size")
+    padding_side: Optional[str] = Field(default="left", description="Padding side for tokenization")
+    truncation_side: Optional[str] = Field(default="left", description="Truncation side for tokenization")
+    max_length: Optional[int] = Field(default=1024, description="Maximum sequence length")
     
     @validator('claims')
     def validate_claims(cls, v):
@@ -105,7 +107,3 @@ class EmbeddingRequest(BaseModel):
             if not claim.strip():
                 raise ValueError(f"Claim at index {i} is empty or only whitespace")
         return v
-
-
-# Most Pydantic models removed - only keeping core models actually used in pipeline
-# The remaining models are only used in examples and tests, not core functionality

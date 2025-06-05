@@ -1,18 +1,11 @@
 # =============================================================================
-# EMBEDDING PIPELINE EXAMPLE CONFIGURATION
+# EMBEDDING PIPELINE CONFIGURATION
 # =============================================================================
-# This configuration demonstrates how to generate embeddings from medical claims
-# using the MediClaimGPT model API.
+# Pure config-driven approach with variable references and no duplication
+# All parameters defined once and referenced throughout the configuration
 
 # =============================================================================
-# INPUT CONFIGURATION
-# =============================================================================
-input:
-  dataset_path: "data/medical_claims_sample.csv"
-  split_ratio: 0.8
-
-# =============================================================================
-# JOB CONFIGURATION
+# JOB CONFIGURATION - Base settings for the entire pipeline
 # =============================================================================
 job:
   name: "embedding_generation_example"
@@ -20,79 +13,69 @@ job:
   random_seed: 42
 
 # =============================================================================
-# MODEL API CONFIGURATION
+# INPUT CONFIGURATION - Data source settings
+# =============================================================================
+input:
+  dataset_path: "data/medical_claims_sample.csv"
+
+# =============================================================================
+# MODEL API CONFIGURATION - Connection settings for MediClaimGPT
 # =============================================================================
 model_api:
   base_url: "http://localhost:8000"
   timeout: 300
   max_retries: 3
-  batch_size: 32
-  
   endpoints:
-    embeddings: "/embeddings"
     embeddings_batch: "/embeddings_batch"
-    generate: "/generate"
-    generate_batch: "/generate_batch"
 
 # =============================================================================
-# PIPELINE STAGES - Only embedding generation enabled
-# =============================================================================
-pipeline_stages:
-  embeddings: true           # Generate embeddings from claims
-  classification: false      # Skip classification for this example
-  evaluation: false          # Skip evaluation for this example
-  target_word_eval: false    # Skip target word evaluation
-  summary_report: false      # Skip summary report
-  method_comparison: false   # Skip method comparison
-
-# =============================================================================
-# DATA PROCESSING CONFIGURATION
-# =============================================================================
-data_processing:
-  random_seed: 42
-  max_sequence_length: 512   # Maximum tokens per claim
-  include_mcid: true         # Include medical claim IDs
-  output_format: "json"      # JSON format for embeddings
-  train_test_split: 0.8      # 80% train, 20% test
-
-# =============================================================================
-# EMBEDDING GENERATION CONFIGURATION
+# EMBEDDING GENERATION CONFIGURATION - Core processing settings
 # =============================================================================
 embedding_generation:
-  batch_size: 8              # Process 8 claims at a time
-  save_interval: 100         # Save progress every 100 samples
-  checkpoint_dir: "examples/outputs/checkpoints"
-  resume_from_checkpoint: false
-  tokenizer_path: "/home/kosaraju/mgpt-serve/tokenizer"  # Path to model tokenizer
+  batch_size: 8
+  max_sequence_length: 1024
+  padding_side: "left"
+  truncation_side: "left"
+  tokenizer_path: "/home/kosaraju/mgpt-serve/tokenizer"
+  output_filename: "${job.name}_embeddings.csv"
 
 # =============================================================================
-# OUTPUT CONFIGURATION
+# OUTPUT CONFIGURATION - Directory structure using variable references
 # =============================================================================
 output:
-  embeddings_dir: "examples/outputs/embeddings"
-  models_dir: "examples/outputs/models"
-  metrics_dir: "examples/outputs/metrics"
-  logs_dir: "examples/outputs/logs"
-  save_best_model_only: false
-  model_format: "pickle"
+  embeddings_dir: "${job.output_dir}/embeddings"
+  logs_dir: "${job.output_dir}/logs"
 
 # =============================================================================
-# LOGGING CONFIGURATION
+# LOGGING CONFIGURATION - Using template references for log file path
 # =============================================================================
 logging:
   level: "INFO"
-  console_level: "INFO"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  file: "/home/kosaraju/mgpt_eval/examples/outputs/logs/embedding_pipeline.log"
-  max_file_size: "10MB"
-  backup_count: 5
+  file: "${output.logs_dir}/embedding_pipeline.log"
 
 # =============================================================================
-# EXAMPLE USAGE NOTES
+# CONFIGURATION NOTES
 # =============================================================================
-# This configuration file demonstrates:
-# 1. How to set up embedding generation from medical claims
-# 2. API connection settings for MediClaimGPT model
-# 3. Batch processing configuration for optimal performance
-# 4. Output directory structure for organized results
-# 5. Logging configuration for debugging and monitoring
+# Variable References Used:
+# - ${job.name} -> "embedding_generation_example"
+# - ${job.output_dir} -> "examples/outputs"
+# - ${output.logs_dir} -> "examples/outputs/logs"
+# 
+# API Format Compatible with:
+# curl -X POST http://localhost:8000/embeddings_batch \
+#   -H "Content-Type: application/json" \
+#   -d '{
+#     "claims": ["claim1", "claim2"],
+#     "padding_side": "left",
+#     "truncation_side": "left",
+#     "max_length": 1024
+#   }'
+#
+# Key Simplifications:
+# - No splitting configuration (handled downstream)
+# - No checkpoint/resume functionality 
+# - Single batch_size parameter
+# - Single random_seed parameter
+# - Relative paths with variable references
+# - Embedding-only pipeline focus

@@ -27,6 +27,7 @@ from transformers import AutoTokenizer
 from tqdm import tqdm
 
 from models.config_models import PipelineConfig
+from models.data_models import EmbeddingRequest
 from utils.logging_utils import get_logger
 
 class EmbeddingPipeline:
@@ -55,7 +56,15 @@ class EmbeddingPipeline:
             RuntimeError: If tokenizer cannot be loaded
         """
         self.config = config
-        self.logger = get_logger("embedding_pipeline", config.logging)
+        
+        # Setup directories first
+        self.config.setup_directories()
+        
+        # Resolve log file path
+        log_config = config.logging
+        log_config.file = config.resolve_template_string(log_config.file)
+        
+        self.logger = get_logger("embedding_pipeline", log_config)
         self.expected_embedding_dim = None
         
         # Initialize tokenizer (required - no fallback)
@@ -77,8 +86,7 @@ class EmbeddingPipeline:
                 "Tokenizer is required for proper text processing."
             )
     
-    def run(self, dataset_path: str, output_path: str, 
-            model_endpoint: Optional[str] = None) -> Dict[str, Any]:
+    def run(self, dataset_path: Optional[str] = None, output_path: Optional[str] = None) -> Dict[str, Any]:
         """
         Run the embedding generation pipeline.
         
@@ -95,6 +103,14 @@ class EmbeddingPipeline:
             ValueError: If data validation fails
             RuntimeError: If embedding generation fails
         """
+        # Use config paths if not provided
+        if dataset_path is None:
+            dataset_path = self.config.resolve_template_string(self.config.input.dataset_path)
+        if output_path is None:
+            embeddings_dir = self.config.resolve_template_string(self.config.output.embeddings_dir)
+            filename = self.config.resolve_template_string(self.config.embedding_generation.output_filename)
+            output_path = f"{embeddings_dir}/{filename}"
+            
         self.logger.info(f"Starting embedding generation for dataset: {dataset_path}")
         
         # Load and validate data
@@ -102,10 +118,7 @@ class EmbeddingPipeline:
         self.logger.info(f"Loaded {len(data)} samples from dataset")
         
         # Generate embeddings (all or nothing)
-        embeddings = self._generate_embeddings(
-            data,
-            model_endpoint or self.config.model_api.base_url
-        )
+        embeddings = self._generate_embeddings(data)
         
         # Validate final count
         if len(embeddings) != len(data):
@@ -161,7 +174,7 @@ class EmbeddingPipeline:
         missing_cols = set(required_cols) - set(data.columns)
         if missing_cols:
             raise ValueError(f"Missing required columns: {missing_cols}")
-        # After existing validation, add:
+        # Validate MCID data type
         if not pd.api.types.is_integer_dtype(data['mcid']) and not pd.api.types.is_string_dtype(data['mcid']):
             raise ValueError("'mcid' column must contain integers or strings")
         
@@ -185,8 +198,7 @@ class EmbeddingPipeline:
         
         return data
     
-    def _generate_embeddings(self, data: pd.DataFrame, 
-                           model_endpoint: str) -> List[List[float]]:
+    def _generate_embeddings(self, data: pd.DataFrame) -> List[List[float]]:
         """
         Generate embeddings for all claims with strict validation.
         
@@ -202,7 +214,7 @@ class EmbeddingPipeline:
         """
         embeddings = []
         batch_size = self.config.embedding_generation.batch_size
-        endpoint = f"{model_endpoint}{self.config.model_api.endpoints['embeddings_batch']}"
+        endpoint = f"{self.config.model_api.base_url}{self.config.model_api.endpoints['embeddings_batch']}"
         
         # Calculate total batches for progress bar
         total_batches = (len(data) + batch_size - 1) // batch_size
@@ -218,7 +230,7 @@ class EmbeddingPipeline:
                 
                 try:
                     # Truncate texts if needed
-                    if self.config.data_processing.max_sequence_length:
+                    if self.config.embedding_generation.max_sequence_length:
                         batch_claims = self._truncate_claims(batch_claims)
                     
                     # Process batch
@@ -334,7 +346,7 @@ class EmbeddingPipeline:
         Raises:
             RuntimeError: If truncation fails
         """
-        max_length = self.config.data_processing.max_sequence_length
+        max_length = self.config.embedding_generation.max_sequence_length
         truncated_claims = []
         
         for i, claim in enumerate(claims):
@@ -378,10 +390,14 @@ class EmbeddingPipeline:
         Raises:
             RuntimeError: If API call fails after all retries
         """
-        payload = {
-            'claims': claims,
-            'batch_size': len(claims)
-        }
+        # Create request using the new API format
+        request = EmbeddingRequest(
+            claims=claims,
+            padding_side=self.config.embedding_generation.padding_side,
+            truncation_side=self.config.embedding_generation.truncation_side, 
+            max_length=self.config.embedding_generation.max_sequence_length
+        )
+        payload = request.dict()
         
         base_delay = 1.0
         base_timeout = self.config.model_api.timeout

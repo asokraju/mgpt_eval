@@ -5,3 +5,10 @@
 2025-06-04 00:06:35,661 - embedding_pipeline - [32mINFO[0m - Set expected embedding dimension: 768
 2025-06-04 00:06:35,703 - embedding_pipeline - [32mINFO[0m - Successfully generated 20 embeddings
 2025-06-04 00:06:35,712 - embedding_pipeline - [32mINFO[0m - Embeddings saved to: outputs/embeddings/sample_embeddings.csv
+2025-06-05 13:45:50,603 - embedding_pipeline - [32mINFO[0m - Successfully loaded tokenizer from /home/kosaraju/mgpt-serve/tokenizer
+2025-06-05 13:45:50,604 - embedding_pipeline - [32mINFO[0m - Starting embedding generation for dataset: data/medical_claims_sample.csv
+2025-06-05 13:45:50,614 - embedding_pipeline - [32mINFO[0m - Loaded 20 samples from dataset
+2025-06-05 13:45:50,614 - embedding_pipeline - [32mINFO[0m - Generating embeddings in 3 batches
+2025-06-05 13:45:51,013 - embedding_pipeline - [32mINFO[0m - Set expected embedding dimension: 768
+2025-06-05 13:45:51,105 - embedding_pipeline - [32mINFO[0m - Successfully generated 20 embeddings
+2025-06-05 13:45:51,115 - embedding_pipeline - [32mINFO[0m - Embeddings saved to: examples/outputs/embeddings/embedding_generation_example_embeddings.csv
